@@ -1,0 +1,10 @@
+{
+  "name": "voice-ai-detection-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend services for voice AI detection.",
+  "main": "server.js",
+  "dependencies": {
+    "@ennuicastr/webrtcvad.js": "0.1.1"
+  }
+}
