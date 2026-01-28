@@ -4,13 +4,14 @@ const fileInput = document.getElementById("audio-file");
 const base64Input = document.getElementById("base64");
 const detectBtn = document.getElementById("detect-btn");
 const loading = document.getElementById("loading");
+const loadingText = document.getElementById("loading-text");
 const errorEl = document.getElementById("error");
 
 const API_KEY = "change-me";
 const API_BASE_URL = "http://localhost:3000";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MIN_DURATION = 10;
-const MAX_DURATION = 300;
+const MAX_DURATION = 900;
 
 const classificationEl = document.getElementById("classification");
 const confidenceTextEl = document.getElementById("confidence-text");
@@ -23,9 +24,38 @@ const allowedMessages = [
   "Processing failed. Please retry.",
 ];
 
+const loadingMessages = ["Uploading audio", "Analyzing voice patterns", "Generating decision"];
+let loadingTimers = [];
+
+const clearLoadingTimers = () => {
+  loadingTimers.forEach((timer) => clearTimeout(timer));
+  loadingTimers = [];
+};
+
+const startLoadingCycle = () => {
+  clearLoadingTimers();
+  if (loadingText) loadingText.textContent = loadingMessages[0];
+  loadingTimers.push(
+    setTimeout(() => {
+      if (loadingText) loadingText.textContent = loadingMessages[1];
+    }, 400)
+  );
+  loadingTimers.push(
+    setTimeout(() => {
+      if (loadingText) loadingText.textContent = loadingMessages[2];
+    }, 1400)
+  );
+};
+
 const setLoading = (isLoading) => {
-  loading.style.display = isLoading ? "inline" : "none";
+  loading.classList.toggle("is-active", isLoading);
   detectBtn.disabled = isLoading;
+  if (isLoading) {
+    startLoadingCycle();
+  } else {
+    clearLoadingTimers();
+    if (loadingText) loadingText.textContent = "Analyzing voice patterns";
+  }
 };
 
 const resetOutput = () => {
@@ -38,6 +68,10 @@ const resetOutput = () => {
   explanationEl.classList.add("muted");
   rawResponseEl.textContent = "No response yet.";
   errorEl.textContent = "";
+};
+
+const clearInputCache = () => {
+  base64Input.value = "";
 };
 
 const updateOutput = (payload) => {
@@ -182,6 +216,7 @@ form.addEventListener("submit", async (event) => {
   } catch (err) {
     errorEl.textContent = "Processing failed. Please retry.";
   } finally {
+    clearInputCache();
     setLoading(false);
   }
 });

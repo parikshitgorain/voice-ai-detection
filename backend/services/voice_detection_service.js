@@ -23,6 +23,7 @@ const detectVoiceSource = async (payload, config) => {
 
   const explanationResult = buildExplanation({
     classification: classificationResult.data.classification,
+    confidenceScore: classificationResult.data.confidenceScore,
     features: featureResult.data.features,
   });
 

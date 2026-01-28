@@ -69,19 +69,23 @@ const handleVoiceDetection = async (req, res, payload, config) => {
     return;
   }
 
-  const result = await detectVoiceSource(payload, config);
-  if (!result.ok) {
-    sendError(
-      res,
-      result.statusCode ?? 400,
-      mapErrorMessage(result.error?.code)
-    );
-    return;
-  }
+  try {
+    const result = await detectVoiceSource(payload, config);
+    if (!result.ok) {
+      sendError(
+        res,
+        result.statusCode ?? 400,
+        mapErrorMessage(result.error?.code)
+      );
+      return;
+    }
 
-  res.statusCode = 200;
-  res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify(result.data));
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(result.data));
+  } finally {
+    replayCache.release(replayCheck.hash);
+  }
 };
 
 module.exports = {

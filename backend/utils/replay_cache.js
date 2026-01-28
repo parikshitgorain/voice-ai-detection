@@ -34,8 +34,14 @@ const createReplayCache = (config) => {
     return { ok: true, hash };
   };
 
+  const release = (hash) => {
+    if (!hash) return;
+    entries.delete(hash);
+  };
+
   return {
     checkAndStore,
+    release,
   };
 };
 

@@ -45,7 +45,7 @@ const decodeMp3ToPcm = async (mp3Buffer, decoder) => {
         error: { code: "DECODE_FAILED", message: "MP3 decode returned invalid data." },
       };
     }
-    return { ok: true, pcm: decoded.pcm, sampleRate: decoded.sampleRate };
+    return { ok: true, pcm: decoded.pcm, sampleRate: decoded.sampleRate, metadata: decoded.metadata };
   } catch (err) {
     return { ok: false, error: { code: "DECODE_FAILED", message: "MP3 decode failed." } };
   }
@@ -69,6 +69,7 @@ const loadAudioFromBase64 = async (audioBase64, decoder, maxBytes) => {
     pcm: decodeResult.pcm,
     sampleRate: decodeResult.sampleRate,
     duration,
+    metadata: decodeResult.metadata ?? null,
   };
 };
 

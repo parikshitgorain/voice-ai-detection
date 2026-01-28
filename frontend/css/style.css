@@ -127,6 +127,66 @@ textarea {
   font-size: 11px;
   color: var(--muted);
   display: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.loading.is-active {
+  display: inline-flex;
+}
+
+.loading-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.25;
+  animation: loading-pulse 0.9s infinite ease-in-out;
+}
+
+.loading-dot:nth-of-type(2) {
+  animation-delay: 0.15s;
+}
+
+.loading-dot:nth-of-type(3) {
+  animation-delay: 0.3s;
+}
+
+.loading-bar {
+  width: 60px;
+  height: 3px;
+  border-radius: 999px;
+  background: #efefef;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-left: 6px;
+}
+
+.loading-bar-fill {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: var(--accent);
+  animation: loading-bar 1.2s infinite ease-in-out;
+}
+
+@keyframes loading-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes loading-bar {
+  0% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(160%);
+  }
 }
 
 .error {

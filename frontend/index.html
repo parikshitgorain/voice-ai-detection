@@ -23,6 +23,7 @@
                 <option value="Hindi">Hindi</option>
                 <option value="Malayalam">Malayalam</option>
                 <option value="Telugu">Telugu</option>
+                <option value="Bengali">Bengali</option>
               </select>
             </div>
 
@@ -38,7 +39,15 @@
 
             <div class="actions">
               <button id="detect-btn" class="primary" type="submit">Detect Voice Source</button>
-              <span id="loading" class="loading" aria-live="polite">Analyzing voice patterns...</span>
+              <div id="loading" class="loading" aria-live="polite">
+                <span id="loading-text">Analyzing voice patterns</span>
+                <span class="loading-dot" aria-hidden="true"></span>
+                <span class="loading-dot" aria-hidden="true"></span>
+                <span class="loading-dot" aria-hidden="true"></span>
+                <span class="loading-bar" aria-hidden="true">
+                  <span class="loading-bar-fill"></span>
+                </span>
+              </div>
             </div>
             <div class="notice">
               Audio is processed transiently for analysis and deleted after completion. No audio or voice

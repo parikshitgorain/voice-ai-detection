@@ -10,6 +10,12 @@ const buildFeatureObject = ({
   windowCount,
   agreementScore,
   noiseScore,
+  metadata,
+  longRange,
+  prosodyPlanning,
+  spectralConsistency,
+  advanced,
+  governance,
 }) => {
   return {
     duration,
@@ -24,6 +30,12 @@ const buildFeatureObject = ({
       windowCount,
       agreementScore,
       noiseScore,
+      metadata,
+      longRange,
+      prosodyPlanning,
+      spectralConsistency,
+      advanced,
+      governance,
     },
   };
 };

@@ -27,6 +27,34 @@ const runCommand = (command, args, inputBuffer) =>
     });
   });
 
+const parseRational = (value) => {
+  if (!value) return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const parts = String(value).split("/");
+  if (parts.length === 1) {
+    const parsed = Number(parts[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  const numerator = Number(parts[0]);
+  const denominator = Number(parts[1]);
+  if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) return null;
+  return numerator / denominator;
+};
+
+const collectTags = (formatTags, streamTags) => {
+  const tags = {};
+  const addTags = (source) => {
+    if (!source) return;
+    for (const [key, value] of Object.entries(source)) {
+      if (value === undefined || value === null) continue;
+      tags[key.toLowerCase()] = String(value);
+    }
+  };
+  addTags(formatTags);
+  addTags(streamTags);
+  return tags;
+};
+
 const probeMp3 = async (filePath) => {
   const args = [
     "-v",
@@ -34,17 +62,39 @@ const probeMp3 = async (filePath) => {
     "-select_streams",
     "a:0",
     "-show_entries",
-    "stream=sample_rate,channels",
+    "stream=sample_rate,channels,codec_name,codec_tag_string,bit_rate,avg_frame_rate,profile:format=bit_rate,format_name,format_long_name,size,duration,probe_score,tags",
     "-of",
     "json",
     filePath,
   ];
   const output = await runCommand("ffprobe", args);
   const parsed = JSON.parse(output.toString("utf8"));
-  const stream = parsed.streams && parsed.streams[0];
+  const stream = parsed.streams && parsed.streams[0] ? parsed.streams[0] : {};
+  const format = parsed.format || {};
+  const tags = collectTags(format.tags, stream.tags);
+
+  const sampleRate = stream.sample_rate ? Number(stream.sample_rate) : null;
+  const channels = stream.channels ? Number(stream.channels) : null;
+  const bitRate = stream.bit_rate
+    ? Number(stream.bit_rate)
+    : format.bit_rate
+    ? Number(format.bit_rate)
+    : null;
+
   return {
-    sampleRate: stream ? Number(stream.sample_rate) : null,
-    channels: stream ? Number(stream.channels) : null,
+    sampleRate: Number.isFinite(sampleRate) ? sampleRate : null,
+    channels: Number.isFinite(channels) ? channels : null,
+    bitRate: Number.isFinite(bitRate) ? bitRate : null,
+    duration: format.duration ? Number(format.duration) : null,
+    size: format.size ? Number(format.size) : null,
+    formatName: format.format_name ?? null,
+    formatLongName: format.format_long_name ?? null,
+    codecName: stream.codec_name ?? null,
+    codecTag: stream.codec_tag_string ?? null,
+    avgFrameRate: parseRational(stream.avg_frame_rate),
+    tags,
+    tagCount: Object.keys(tags).length,
+    encoder: tags.encoder ?? null,
   };
 };
 
@@ -82,10 +132,38 @@ const decodeMp3 = async (buffer) => {
     );
 
     const mono = toMono(floatArray, meta.channels);
-    return { pcm: mono, sampleRate: meta.sampleRate };
+    return { pcm: mono, sampleRate: meta.sampleRate, metadata: meta };
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true });
   }
+};
+
+const encodePcmToMp3 = async (pcm, sampleRate, bitrateKbps = 96) => {
+  if (!pcm || !pcm.length) {
+    throw new Error("PCM buffer is empty.");
+  }
+  const rate = Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : 16000;
+  const args = [
+    "-v",
+    "error",
+    "-f",
+    "f32le",
+    "-ar",
+    String(rate),
+    "-ac",
+    "1",
+    "-i",
+    "-",
+    "-codec:a",
+    "libmp3lame",
+    "-b:a",
+    `${bitrateKbps}k`,
+    "-f",
+    "mp3",
+    "-",
+  ];
+  const pcmBuffer = Buffer.from(pcm.buffer, pcm.byteOffset, pcm.byteLength);
+  return runCommand("ffmpeg", args, pcmBuffer);
 };
 
 const toMono = (interleaved, channels) => {
@@ -105,4 +183,5 @@ const toMono = (interleaved, channels) => {
 
 module.exports = {
   decodeMp3,
+  encodePcmToMp3,
 };
