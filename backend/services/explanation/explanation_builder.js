@@ -67,9 +67,9 @@ const buildConfidentExplanation = (classification, signals) => {
   const phrases = chosen.map((signal) => signal.phrase);
   const base = phrases.length === 1 ? phrases[0] : `${phrases[0]} and ${phrases[1]}`;
   if (classification === "AI_GENERATED") {
-    return { text: `${base}, indicating planned speech control.`, used: chosen };
+    return { text: `${base}, suggesting more controlled speech patterns.`, used: chosen };
   }
-  return { text: `${base}, indicating lack of synthetic consistency.`, used: chosen };
+  return { text: `${base}, consistent with less controlled variability.`, used: chosen };
 };
 
 const buildAmbiguousExplanation = (signals) => {
@@ -94,7 +94,10 @@ const buildAmbiguousExplanation = (signals) => {
   }
 
   if (ambiguous.length && !used.some((signal) => signal.id === ambiguous[0].id)) {
-    return { text: `${sentence} ${ambiguous[0].phrase}.`, used: [...used, ambiguous[0]] };
+    return {
+      text: `${sentence} Uncertainty is elevated because ${ambiguous[0].phrase}.`,
+      used: [...used, ambiguous[0]],
+    };
   }
   return { text: sentence, used };
 };
@@ -105,8 +108,13 @@ const buildExplanation = ({ classification, confidenceScore, features }) => {
   }
 
   const signals = mapSignals(features);
+  const governance = features.governance || {};
+  const isMixed =
+    (Number.isFinite(governance.groupDisagreement) && governance.groupDisagreement >= 0.45) ||
+    (Number.isFinite(governance.windowDisagreement) && governance.windowDisagreement >= 0.45) ||
+    (Number.isFinite(governance.lowSignalScore) && governance.lowSignalScore >= 0.5);
   const isLowConfidence = Number.isFinite(confidenceScore) && confidenceScore < 0.4;
-  let result = isLowConfidence
+  let result = isLowConfidence || isMixed
     ? buildAmbiguousExplanation(signals)
     : buildConfidentExplanation(classification, signals);
 
@@ -128,8 +136,8 @@ const buildExplanation = ({ classification, confidenceScore, features }) => {
         const base = phrases.length === 1 ? phrases[0] : `${phrases[0]} and ${phrases[1]}`;
         explanation =
           classification === "AI_GENERATED"
-            ? `${base}, indicating planned speech control.`
-            : `${base}, indicating lack of synthetic consistency.`;
+            ? `${base}, suggesting more controlled speech patterns.`
+            : `${base}, consistent with less controlled variability.`;
         usedSignals = alt;
         signature = buildSignature(classification, confidenceScore, usedSignals);
       }
@@ -159,7 +167,9 @@ const buildExplanation = ({ classification, confidenceScore, features }) => {
       (signal) => !usedSignals.some((used) => used.id === signal.id)
     );
     if (extra) {
-      explanation = `${explanation} ${extra.phrase}.`;
+      if (explanation.split(".").length <= 2) {
+        explanation = `${explanation} ${extra.phrase}.`;
+      }
       usedSignals = [...usedSignals, extra];
       signature = buildSignature(classification, confidenceScore, usedSignals);
     }

@@ -1,6 +1,7 @@
 const { buildFeatureSet } = require("./audio_pipeline");
 const { classifyFeatures } = require("./classifier");
 const { buildExplanation } = require("./explanation");
+const { computeLanguageWarning } = require("./language_warning");
 
 const detectVoiceSource = async (payload, config) => {
   const featureResult = await buildFeatureSet(payload.audioBase64, {}, config);
@@ -33,6 +34,10 @@ const detectVoiceSource = async (payload, config) => {
       classification: classificationResult.data.classification,
       confidenceScore: classificationResult.data.confidenceScore,
       explanation: explanationResult.explanation,
+      languageWarning: computeLanguageWarning(
+        featureResult.data.features,
+        payload.language
+      ).languageWarning,
     },
   };
 };

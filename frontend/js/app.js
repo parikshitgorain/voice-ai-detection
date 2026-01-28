@@ -6,6 +6,7 @@ const detectBtn = document.getElementById("detect-btn");
 const loading = document.getElementById("loading");
 const loadingText = document.getElementById("loading-text");
 const errorEl = document.getElementById("error");
+const languageWarningEl = document.getElementById("language-warning");
 
 const API_KEY = "change-me";
 const API_BASE_URL = "http://localhost:3000";
@@ -68,6 +69,7 @@ const resetOutput = () => {
   explanationEl.classList.add("muted");
   rawResponseEl.textContent = "No response yet.";
   errorEl.textContent = "";
+  languageWarningEl.classList.remove("is-active");
 };
 
 const clearInputCache = () => {
@@ -88,6 +90,11 @@ const updateOutput = (payload) => {
   explanationEl.classList.remove("muted");
 
   rawResponseEl.textContent = JSON.stringify(payload, null, 2);
+  if (payload.languageWarning) {
+    languageWarningEl.classList.add("is-active");
+  } else {
+    languageWarningEl.classList.remove("is-active");
+  }
 };
 
 const mapUserMessage = (message) => {

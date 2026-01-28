@@ -1,6 +1,6 @@
 const config = {
   apiKey: process.env.VOICE_DETECT_API_KEY || "change-me",
-  supportedLanguages: ["Tamil", "English", "Hindi", "Malayalam", "Telugu", "Bengali"],
+  supportedLanguages: ["Tamil", "English", "Hindi", "Malayalam", "Telugu"],
   audioFormat: "mp3",
   limits: {
     maxFileBytes: 50 * 1024 * 1024,

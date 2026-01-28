@@ -50,6 +50,18 @@ const applyLowSignalGovernance = (probability, lowSignalScore) => {
   return result;
 };
 
+const applyMixedSignalCap = (probability, groupDisagreement, windowDisagreement, lowSignalScore) => {
+  const groupHigh = Number.isFinite(groupDisagreement) && groupDisagreement >= 0.5;
+  const windowHigh = Number.isFinite(windowDisagreement) && windowDisagreement >= 0.5;
+  const lowSignalHigh = Number.isFinite(lowSignalScore) && lowSignalScore >= 0.55;
+  if (!groupHigh && !windowHigh && !lowSignalHigh) return probability;
+
+  const maxDistance = 0.12;
+  const delta = probability - 0.5;
+  const capped = Math.min(Math.max(delta, -maxDistance), maxDistance);
+  return 0.5 + capped;
+};
+
 const capForLowSignal = (value, lowSignalScore) => {
   if (!Number.isFinite(lowSignalScore)) return value;
   if (lowSignalScore > 0.6) return clamp(value, 0.05, 0.6);
@@ -74,7 +86,10 @@ const calibrateConfidence = (probability, context = {}) => {
   adjusted = applyLowSignalGovernance(adjusted, lowSignalScore);
 
   const softened = 0.1 + adjusted * 0.8;
-  const capped = capForLowSignal(softened, lowSignalScore);
+  const capped = capForLowSignal(
+    applyMixedSignalCap(softened, groupDisagreement, windowDisagreement, lowSignalScore),
+    lowSignalScore
+  );
   return clamp(capped, 0.05, 0.95);
 };
 

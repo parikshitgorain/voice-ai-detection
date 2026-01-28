@@ -195,6 +195,17 @@ textarea {
   min-height: 14px;
 }
 
+.warning {
+  font-size: 11px;
+  color: #8a6d1d;
+  margin-top: 4px;
+  display: none;
+}
+
+.warning.is-active {
+  display: block;
+}
+
 .output {
   display: flex;
   flex-direction: column;
