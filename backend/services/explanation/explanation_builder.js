@@ -76,21 +76,34 @@ const buildAmbiguousExplanation = (signals) => {
   const human = pickAligned(signals, "HUMAN", 1);
   const ai = pickAligned(signals, "AI_GENERATED", 1);
   const ambiguous = pickAmbiguous(signals);
+  const multiSpeaker = signals.find((signal) => signal.id === "multi_speaker");
 
   let sentence = "Signals were mixed";
   const used = [];
+  if (multiSpeaker && multiSpeaker.strength >= 0.6) {
+    sentence = `Signals were mixed; ${multiSpeaker.phrase}.`;
+    used.push(multiSpeaker);
+  }
   if (human.length && ai.length) {
-    sentence += `: ${human[0].phrase}, while ${ai[0].phrase}.`;
+    if (!used.length) {
+      sentence += `: ${human[0].phrase}, while ${ai[0].phrase}.`;
+    }
     used.push(human[0], ai[0]);
   } else if (human.length || ai.length) {
     const pick = human.length ? human[0] : ai[0];
-    sentence += `: ${pick.phrase}.`;
+    if (!used.length) {
+      sentence += `: ${pick.phrase}.`;
+    }
     used.push(pick);
   } else if (ambiguous.length) {
-    sentence += `; ${ambiguous[0].phrase}.`;
+    if (!used.length) {
+      sentence += `; ${ambiguous[0].phrase}.`;
+    }
     used.push(ambiguous[0]);
   } else {
-    sentence += ".";
+    if (!used.length) {
+      sentence += ".";
+    }
   }
 
   if (ambiguous.length && !used.some((signal) => signal.id === ambiguous[0].id)) {
@@ -109,7 +122,9 @@ const buildExplanation = ({ classification, confidenceScore, features }) => {
 
   const signals = mapSignals(features);
   const governance = features.governance || {};
+  const multiSpeakerDetected = features.multiSpeaker?.detected === true;
   const isMixed =
+    multiSpeakerDetected ||
     (Number.isFinite(governance.groupDisagreement) && governance.groupDisagreement >= 0.45) ||
     (Number.isFinite(governance.windowDisagreement) && governance.windowDisagreement >= 0.45) ||
     (Number.isFinite(governance.lowSignalScore) && governance.lowSignalScore >= 0.5);

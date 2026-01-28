@@ -6,10 +6,11 @@ const config = {
     maxFileBytes: 50 * 1024 * 1024,
     maxBodyBytes: 80 * 1024 * 1024,
     minDurationSeconds: 10,
-    maxDurationSeconds: 900,
+    maxDurationSeconds: 300,
     longAudioThresholdSeconds: 15,
     windowDurationSeconds: 9,
     maxWindowCount: 6,
+    windowOverlapRatio: 0.5,
     fixedWindowOffsets: [0.2, 0.4, 0.6, 0.8],
   },
   rateLimit: {
@@ -66,6 +67,16 @@ const config = {
   compressionTest: {
     enabled: true,
     bitratesKbps: [64, 96],
+  },
+  deepModel: {
+    enabled: false,
+    pythonPath: process.env.DEEP_MODEL_PYTHON || "python",
+    scriptPath: process.env.DEEP_MODEL_SCRIPT || null,
+    modelPath: process.env.DEEP_MODEL_PATH || null,
+    device: process.env.DEEP_MODEL_DEVICE || "cpu",
+    timeoutMs: 30000,
+    fusionWeight: 0.2,
+    evidenceThreshold: 0.75,
   },
 };
 

@@ -91,6 +91,42 @@ const estimateLanguage = (features) => {
   };
 };
 
+const estimateLanguageDistribution = (features) => {
+  const zcr = Number.isFinite(features?.zcr?.mean) ? features.zcr.mean : null;
+  const spectral = Number.isFinite(features?.spectralFlatness?.mean)
+    ? features.spectralFlatness.mean
+    : null;
+  const stress = Number.isFinite(features?.prosodyPlanning?.stressSymmetry)
+    ? features.prosodyPlanning.stressSymmetry
+    : null;
+  const pitchStd = Number.isFinite(features?.pitch?.std) ? features.pitch.std : null;
+  const emphasis = Number.isFinite(features?.prosodyPlanning?.emphasisRegularity)
+    ? features.prosodyPlanning.emphasisRegularity
+    : null;
+
+  const scored = [];
+  for (const [language, profile] of Object.entries(LANGUAGE_PROFILES)) {
+    const score = meanScore([
+      scoreTarget(zcr, profile.zcr.target, profile.zcr.scale),
+      scoreTarget(spectral, profile.spectral.target, profile.spectral.scale),
+      scoreTarget(stress, profile.stress.target, profile.stress.scale),
+      scoreTarget(pitchStd, profile.pitchStd.target, profile.pitchStd.scale),
+      scoreTarget(emphasis, profile.emphasis.target, profile.emphasis.scale),
+    ]);
+    if (Number.isFinite(score)) scored.push({ language, score });
+  }
+
+  if (!scored.length) return { distribution: null };
+  const maxScore = Math.max(...scored.map((item) => item.score));
+  const expScores = scored.map((item) => Math.exp(item.score - maxScore));
+  const sum = expScores.reduce((a, b) => a + b, 0);
+  const distribution = {};
+  for (let i = 0; i < scored.length; i += 1) {
+    distribution[scored[i].language] = clamp01(expScores[i] / sum);
+  }
+  return { distribution };
+};
+
 const computeLanguageWarning = (features, selectedLanguage) => {
   if (!selectedLanguage) return { languageWarning: false };
   const estimate = estimateLanguage(features);
@@ -105,4 +141,5 @@ const computeLanguageWarning = (features, selectedLanguage) => {
 
 module.exports = {
   computeLanguageWarning,
+  estimateLanguageDistribution,
 };

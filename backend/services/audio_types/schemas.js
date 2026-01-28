@@ -15,6 +15,8 @@ const buildFeatureObject = ({
   prosodyPlanning,
   spectralConsistency,
   advanced,
+  deepScore,
+  multiSpeaker,
   governance,
 }) => {
   return {
@@ -35,6 +37,8 @@ const buildFeatureObject = ({
       prosodyPlanning,
       spectralConsistency,
       advanced,
+      deepScore,
+      multiSpeaker,
       governance,
     },
   };

@@ -2,6 +2,7 @@ const { loadModel } = require("./model_loader");
 const { toFeatureVector } = require("./feature_adapter");
 const { predictProbability } = require("./predictor");
 const { calibrateConfidence } = require("./confidence_calibrator");
+const config = require("../../config");
 
 const model = loadModel();
 
@@ -65,6 +66,50 @@ const computeFallbackScore = (features) => {
   ]);
 };
 
+const countAiEvidenceGroups = (features) => {
+  if (!features) return 0;
+  const longRange = features.longRange || {};
+  const prosody = features.prosodyPlanning || {};
+  const spectral = features.spectralConsistency || {};
+  const advanced = features.advanced || {};
+  const metadata = features.metadata || {};
+  const deepScore = features.deepScore;
+
+  const groupFlags = {
+    longRange:
+      Number.isFinite(longRange.varianceStability) && longRange.varianceStability > 0.65 ||
+      Number.isFinite(longRange.prosodyEntropyStability) && longRange.prosodyEntropyStability > 0.65 ||
+      Number.isFinite(longRange.pitchEnergyCouplingStability) && longRange.pitchEnergyCouplingStability > 0.65,
+    prosody:
+      Number.isFinite(prosody.stressSymmetry) && prosody.stressSymmetry > 0.6 ||
+      Number.isFinite(prosody.intonationSmoothness) && prosody.intonationSmoothness > 0.6 ||
+      Number.isFinite(prosody.emphasisRegularity) && prosody.emphasisRegularity > 0.6 ||
+      Number.isFinite(prosody.microProsodyVariability) && prosody.microProsodyVariability < 0.3,
+    spectral:
+      Number.isFinite(spectral.phaseDeltaStability) && spectral.phaseDeltaStability > 0.6 ||
+      Number.isFinite(spectral.phaseEntropyStability) && spectral.phaseEntropyStability > 0.6 ||
+      Number.isFinite(spectral.microPhaseStability) && spectral.microPhaseStability > 0.6 ||
+      Number.isFinite(spectral.hfDecayRegularity) && spectral.hfDecayRegularity > 0.6 ||
+      Number.isFinite(spectral.spectralWobbleStability) && spectral.spectralWobbleStability > 0.6,
+    compression:
+      Number.isFinite(advanced.compressionConsistency) && advanced.compressionConsistency > 0.75,
+    breath:
+      Number.isFinite(advanced.breathCouplingAnomaly) && advanced.breathCouplingAnomaly > 0.6 ||
+      Number.isFinite(advanced.breathCouplingStability) && advanced.breathCouplingStability > 0.6,
+    phase:
+      Number.isFinite(advanced.phaseCoherence) && advanced.phaseCoherence > 0.6,
+    planning:
+      Number.isFinite(advanced.pmciWeakness) && advanced.pmciWeakness > 0.6,
+    metadata:
+      Number.isFinite(metadata.suspicionScore) && metadata.suspicionScore > 0.6,
+    deep:
+      Number.isFinite(deepScore) &&
+      deepScore > (config?.deepModel?.evidenceThreshold ?? 0.75),
+  };
+
+  return Object.values(groupFlags).filter(Boolean).length;
+};
+
 const classifyFeatures = (featureObject) => {
   if (!featureObject || !featureObject.features) {
     return {
@@ -93,6 +138,23 @@ const classifyFeatures = (featureObject) => {
       fusedProbability = clamp01(rawProbability * (1 - weight) + fallbackScore * weight);
     }
   }
+  const deepScore = featureObject.features?.deepScore;
+  if (Number.isFinite(deepScore)) {
+    const weight = clamp01(config?.deepModel?.fusionWeight ?? 0.2);
+    if (weight > 0) {
+      fusedProbability = clamp01(fusedProbability * (1 - weight) + deepScore * weight);
+    }
+  }
+
+  const aiEvidenceCount = countAiEvidenceGroups(featureObject.features);
+  if (fusedProbability >= 0.5 && aiEvidenceCount < 2) {
+    fusedProbability = Math.min(fusedProbability, 0.49);
+  }
+
+  if (featureObject.features?.multiSpeaker?.detected) {
+    fusedProbability = Math.min(fusedProbability, 0.4);
+  }
+
   const agreementScore = featureObject.features?.agreementScore;
   const noiseScore = featureObject.features?.noiseScore;
   const governance = featureObject.features?.governance ?? {};

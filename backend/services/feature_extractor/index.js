@@ -37,6 +37,15 @@ const skewness = (values) => {
   return total / values.length;
 };
 
+const kurtosis = (values) => {
+  if (!values.length) return 0;
+  const avg = mean(values);
+  const std = stdDev(values, avg);
+  if (std === 0) return 0;
+  const total = values.reduce((sum, value) => sum + Math.pow((value - avg) / std, 4), 0);
+  return total / values.length;
+};
+
 const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const clamp01 = (value) => clamp(value, 0, 1);
 
@@ -830,6 +839,12 @@ const extractFeatures = async (pcm, sampleRate, deps = {}) => {
     const pitchEntropy = entropy(filterFinite(pitchValues), config.entropyBins);
     const energyEntropy = entropy(rmsValues, config.entropyBins);
     const pitchEnergyCorrelation = correlation(pitchValues, rmsValues);
+    const pitchSkewness = skewness(filterFinite(pitchValues));
+    const pitchKurtosis = kurtosis(filterFinite(pitchValues));
+    const pitchBimodality =
+      Number.isFinite(pitchKurtosis) && pitchKurtosis > 0
+        ? clamp01((pitchSkewness * pitchSkewness + 1) / pitchKurtosis)
+        : null;
 
     const peakDistanceFrames = Math.max(1, Math.floor(config.peakMinDistanceMs / hopMs));
     const stressPeaks = findPeaks(
@@ -888,6 +903,7 @@ const extractFeatures = async (pcm, sampleRate, deps = {}) => {
       pitchEntropy,
       energyEntropy,
       pitchEnergyCorrelation,
+      pitchBimodality,
       stressSymmetry,
       emphasisRegularity,
       intonationSmoothness,

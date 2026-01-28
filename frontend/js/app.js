@@ -12,7 +12,7 @@ const API_KEY = "change-me";
 const API_BASE_URL = "http://localhost:3000";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MIN_DURATION = 10;
-const MAX_DURATION = 900;
+const MAX_DURATION = 300;
 
 const classificationEl = document.getElementById("classification");
 const confidenceTextEl = document.getElementById("confidence-text");

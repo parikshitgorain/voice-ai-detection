@@ -2,6 +2,7 @@ const { buildFeatureSet } = require("./audio_pipeline");
 const { classifyFeatures } = require("./classifier");
 const { buildExplanation } = require("./explanation");
 const { computeLanguageWarning } = require("./language_warning");
+const { inferDeepScore } = require("./deep_model");
 
 const detectVoiceSource = async (payload, config) => {
   const featureResult = await buildFeatureSet(payload.audioBase64, {}, config);
@@ -11,6 +12,11 @@ const detectVoiceSource = async (payload, config) => {
       error: featureResult.error,
       statusCode: featureResult.statusCode,
     };
+  }
+
+  const deepResult = await inferDeepScore(payload.audioBase64, config);
+  if (deepResult.ok && Number.isFinite(deepResult.score)) {
+    featureResult.data.features.deepScore = deepResult.score;
   }
 
   const classificationResult = classifyFeatures(featureResult.data);

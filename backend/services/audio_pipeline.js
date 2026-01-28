@@ -27,30 +27,63 @@ const selectWindows = (pcm, sampleRate, durationSeconds, config) => {
 
   const lastStart = Math.max(0, pcm.length - windowSamples);
   const middleStart = Math.max(0, Math.floor(pcm.length / 2 - windowSamples / 2));
-  const seen = new Set();
+  const overlapRatio = clamp01(
+    Number.isFinite(config.windowOverlapRatio) ? config.windowOverlapRatio : 0.5
+  );
+  const stride = Math.max(1, Math.floor(windowSamples * (1 - overlapRatio)));
 
-  const addWindow = (label, start) => {
+  const candidates = [];
+  const addCandidate = (label, start) => {
     const clamped = Math.max(0, Math.min(start, lastStart));
-    const key = Math.floor(clamped);
-    if (seen.has(key)) return;
-    seen.add(key);
-    windows.push({ label, pcm: sliceWindow(pcm, key, windowSamples) });
+    candidates.push({ label, start: clamped });
   };
 
-  addWindow("start", 0);
-  addWindow("middle", middleStart);
-  addWindow("end", lastStart);
+  addCandidate("start", 0);
+  addCandidate("middle", middleStart);
+  addCandidate("end", lastStart);
 
   if (Array.isArray(config.fixedWindowOffsets)) {
     for (const offset of config.fixedWindowOffsets) {
       if (!Number.isFinite(offset)) continue;
       const normalized = clamp01(offset);
       const start = Math.floor((pcm.length - windowSamples) * normalized);
-      addWindow(`offset_${Math.round(normalized * 100)}`, start);
+      addCandidate(`offset_${Math.round(normalized * 100)}`, start);
     }
   }
 
-  return windows.slice(0, config.maxWindowCount);
+  if (stride > 0) {
+    let idx = 0;
+    for (let start = 0; start <= lastStart; start += stride) {
+      addCandidate(`overlap_${idx}`, start);
+      idx += 1;
+    }
+  }
+
+  const seen = new Set();
+  const unique = [];
+  for (const item of candidates) {
+    const key = Math.floor(item.start);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(item);
+  }
+
+  let selected = unique;
+  const maxCount = Number.isFinite(config.maxWindowCount) ? config.maxWindowCount : unique.length;
+  if (unique.length > maxCount && maxCount > 0) {
+    const step = maxCount === 1 ? 0 : (unique.length - 1) / (maxCount - 1);
+    selected = [];
+    for (let i = 0; i < maxCount; i += 1) {
+      const idx = Math.round(i * step);
+      selected.push(unique[idx]);
+    }
+  }
+
+  for (const item of selected) {
+    windows.push({ label: item.label, pcm: sliceWindow(pcm, item.start, windowSamples) });
+  }
+
+  return windows;
 };
 
 const aggregateNumeric = (values) => {
@@ -350,12 +383,26 @@ const computeProsodyPlanningSignals = (windowAnalyses) => {
     const slopes = windowAnalyses.map((item) => item?.contourSlope).filter(Number.isFinite);
     return stabilityFromStd(slopes, 15);
   })();
+  const microProsodyVariability = (() => {
+    const intonationValues = windowAnalyses
+      .map((item) => item?.intonationSmoothness)
+      .filter(Number.isFinite);
+    const contourValues = windowAnalyses
+      .map((item) => item?.contourSlope)
+      .filter(Number.isFinite);
+    const rels = [relativeStd(intonationValues), relativeStd(contourValues)].filter(
+      Number.isFinite
+    );
+    if (!rels.length) return null;
+    return clamp01(aggregateNumeric(rels) / 0.6);
+  })();
 
   return {
     stressSymmetry,
     intonationSmoothness,
     emphasisRegularity,
     contourPredictability,
+    microProsodyVariability,
   };
 };
 
@@ -383,6 +430,10 @@ const computeSpectralConsistency = (windowAnalyses) => {
   const phaseDeltaStability = Number.isFinite(phaseDeltaStd)
     ? clamp01(1 - phaseDeltaStd)
     : null;
+  const phaseEntropyValues = windowAnalyses
+    .map((item) => item?.spectral?.phaseEntropy)
+    .filter(Number.isFinite);
+  const phaseEntropyStability = stabilityFromStd(phaseEntropyValues, 0.15);
   const fluxStability = aggregateNumeric(
     windowAnalyses
       .map((item) => item?.spectral?.fluxStability)
@@ -399,6 +450,7 @@ const computeSpectralConsistency = (windowAnalyses) => {
     spectralWobbleStability,
     microPhaseStability,
     phaseDeltaStability,
+    phaseEntropyStability,
     fluxStability,
     rolloffStability,
   };
@@ -469,6 +521,18 @@ const computeBreathCouplingAnomaly = (windowAnalyses, baseline) => {
   return clamp01(weightedSum / weightTotal);
 };
 
+const computeBreathCouplingStability = (windowAnalyses) => {
+  const scores = [];
+  for (const analysis of windowAnalyses) {
+    const breath = analysis?.breath;
+    if (!breath || breath.eventCount < 2 || !Number.isFinite(breath.couplingScore)) continue;
+    const couplingNormalized = clamp01((breath.couplingScore + 1) / 2);
+    scores.push(couplingNormalized);
+  }
+  if (scores.length < 2) return null;
+  return stabilityFromStd(scores, 0.25);
+};
+
 const computePhaseCoherence = (windowAnalyses) => {
   const entropies = windowAnalyses
     .map((item) => item?.spectral?.phaseEntropy)
@@ -476,6 +540,32 @@ const computePhaseCoherence = (windowAnalyses) => {
   if (!entropies.length) return null;
   const avgEntropy = aggregateNumeric(entropies);
   return clamp01(1 - avgEntropy);
+};
+
+const computeMultiSpeakerEvidence = (windowFeatures, windowAnalyses) => {
+  if (!windowFeatures.length || !windowAnalyses.length) {
+    return { score: 0, detected: false };
+  }
+
+  let flagged = 0;
+  let total = 0;
+  for (let i = 0; i < windowFeatures.length; i += 1) {
+    const pitch = windowFeatures[i]?.pitch;
+    const analysis = windowAnalyses[i];
+    const bimodality = analysis?.pitchBimodality;
+    if (!Number.isFinite(bimodality)) continue;
+    if (!Number.isFinite(pitch?.range) || !Number.isFinite(pitch?.std)) continue;
+    total += 1;
+    const strongBimodal = bimodality >= 0.6;
+    const wideRange = pitch.range >= 120;
+    const highStd = pitch.std >= 55;
+    if (strongBimodal && wideRange && highStd) flagged += 1;
+  }
+
+  if (!total) return { score: 0, detected: false };
+  const score = clamp01(flagged / total);
+  const detected = score >= 0.6 && (total >= 2 || score === 1);
+  return { score, detected };
 };
 
 const computeSignalGovernance = (metadata, longRange, prosodyPlanning, spectralConsistency, advanced, stability, windowDisagreement) => {
@@ -503,18 +593,21 @@ const computeSignalGovernance = (metadata, longRange, prosodyPlanning, spectralC
     prosodyPlanning?.intonationSmoothness,
     prosodyPlanning?.emphasisRegularity,
     prosodyPlanning?.contourPredictability,
+    prosodyPlanning?.microProsodyVariability,
   ]));
   addScore(meanOf([
     spectralConsistency?.hfDecayRegularity,
     spectralConsistency?.spectralWobbleStability,
     spectralConsistency?.microPhaseStability,
     spectralConsistency?.phaseDeltaStability,
+    spectralConsistency?.phaseEntropyStability,
     spectralConsistency?.fluxStability,
     spectralConsistency?.rolloffStability,
   ]));
   addScore(meanOf([
     advanced?.pmciWeakness,
     advanced?.breathCouplingAnomaly,
+    advanced?.breathCouplingStability,
     advanced?.phaseCoherence,
     advanced?.compressionConsistency,
   ]));
@@ -540,14 +633,17 @@ const computeSignalGovernance = (metadata, longRange, prosodyPlanning, spectralC
     prosodyPlanning?.intonationSmoothness,
     prosodyPlanning?.emphasisRegularity,
     prosodyPlanning?.contourPredictability,
+    prosodyPlanning?.microProsodyVariability,
     spectralConsistency?.hfDecayRegularity,
     spectralConsistency?.spectralWobbleStability,
     spectralConsistency?.microPhaseStability,
     spectralConsistency?.phaseDeltaStability,
+    spectralConsistency?.phaseEntropyStability,
     spectralConsistency?.fluxStability,
     spectralConsistency?.rolloffStability,
     advanced?.pmciWeakness,
     advanced?.breathCouplingAnomaly,
+    advanced?.breathCouplingStability,
     advanced?.phaseCoherence,
     advanced?.compressionConsistency,
     stability?.overall,
@@ -629,20 +725,23 @@ const buildFeatureSet = async (audioBase64, deps = {}, config) => {
       return { ...loadResult, statusCode };
     }
 
-    if (loadResult.duration < config.limits.minDurationSeconds) {
-      return {
-        ok: false,
-        error: { code: "DURATION_TOO_SHORT", message: "Audio duration is under 10 seconds." },
-        statusCode: 400,
-      };
-    }
+    const ignoreDurationChecks = Boolean(config?.limits?.disableDurationChecks);
+    if (!ignoreDurationChecks) {
+      if (loadResult.duration < config.limits.minDurationSeconds) {
+        return {
+          ok: false,
+          error: { code: "DURATION_TOO_SHORT", message: "Audio duration is under 10 seconds." },
+          statusCode: 400,
+        };
+      }
 
-    if (loadResult.duration > config.limits.maxDurationSeconds) {
-      return {
-        ok: false,
-        error: { code: "DURATION_TOO_LONG", message: "Audio exceeds 5 minute limit." },
-        statusCode: 400,
-      };
+      if (loadResult.duration > config.limits.maxDurationSeconds) {
+        return {
+          ok: false,
+          error: { code: "DURATION_TOO_LONG", message: "Audio exceeds 5 minute limit." },
+          statusCode: 400,
+        };
+      }
     }
 
     if (config.vad?.enabled) {
@@ -709,7 +808,9 @@ const buildFeatureSet = async (audioBase64, deps = {}, config) => {
       windowAnalyses,
       config.analysis?.breath?.baseline
     );
+    const breathCouplingStability = computeBreathCouplingStability(windowAnalyses);
     const phaseCoherence = computePhaseCoherence(windowAnalyses);
+    const multiSpeaker = computeMultiSpeakerEvidence(windowResults, windowAnalyses);
 
     let compressionConsistency = null;
     let compressionConsistencySpread = null;
@@ -750,6 +851,7 @@ const buildFeatureSet = async (audioBase64, deps = {}, config) => {
     const advanced = {
       pmciWeakness,
       breathCouplingAnomaly,
+      breathCouplingStability,
       phaseCoherence,
       compressionConsistency,
       compressionConsistencySpread,
@@ -784,6 +886,7 @@ const buildFeatureSet = async (audioBase64, deps = {}, config) => {
         prosodyPlanning,
         spectralConsistency,
         advanced,
+        multiSpeaker,
         governance,
       }),
       windows: windowResults,
