@@ -57,3 +57,10 @@ How to use this training system (conceptual)
 - Start the training pipeline on a machine with adequate GPU memory for the chosen model size.
 - Training produces a compact model artifact that is loaded by the backend at inference time.
 - After training, datasets can be removed; only the trained model is required for VPS deployment.
+
+Trained model artifacts (per-language)
+- English: `backend/deep/multitask_English.pt`
+- Hindi: `backend/deep/multitask_Hindi.pt`
+- Tamil: `backend/deep/multitask_Tamil.pt`
+- Malayalam: `backend/deep/multitask_Malayalam.pt`
+- Telugu: `backend/deep/multitask_Telugu.pt`

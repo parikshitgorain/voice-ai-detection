@@ -64,7 +64,11 @@ Success response:
 {
   "classification": "AI_GENERATED" | "HUMAN",
   "confidenceScore": 0.0,
-  "explanation": "Short technical explanation"
+  "explanation": "Short technical explanation",
+  "languageWarning": false,
+  "languageWarningReason": "Selected language \"Hindi\" may be incorrect. Detected \"Tamil\".",
+  "detectedLanguage": "Hindi",
+  "languageConfidence": 0.82
 }
 ```
 
@@ -80,3 +84,19 @@ Error response (always JSON):
 - Non-speech audio is rejected before classification.
 - VAD is implemented with WebRTC VAD compiled to WebAssembly
   (`@ennuicastr/webrtcvad.js`) to avoid native build issues.
+
+## Deep Model (Multitask)
+The backend can fuse a deep model score into the final decision. The default
+deep model path can be overridden via `DEEP_MODEL_PATH`.
+
+Trained model artifacts (included in this repo):
+- `backend/deep/multitask_English.pt`
+- `backend/deep/multitask_Hindi.pt`
+- `backend/deep/multitask_Tamil.pt`
+- `backend/deep/multitask_Malayalam.pt`
+- `backend/deep/multitask_Telugu.pt`
+
+Runtime requirements (for inference):
+- Python 3.9+
+- `backend/deep/.venv` created and installed via
+  `pip install -r backend/deep/requirements.txt`

@@ -10,5 +10,7 @@ This directory structure is final and should remain stable.
 - `classifier/` Feature-based classification + calibration
 - `explanation/` Reserved for future explanation layer
 - `vad/` Speech presence detection gate (WebRTC VAD)
+- `deep_model/` Optional deep-model inference bridge (Python)
+- `language_warning.js` Language mismatch warning (selected vs detected)
 
 Do not move files or merge responsibilities without an explicit design change.
