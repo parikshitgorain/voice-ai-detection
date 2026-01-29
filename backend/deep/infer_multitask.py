@@ -24,13 +24,19 @@ def build_model(arch, lang_count):
         def __init__(self):
             super().__init__()
             self.backbone = backbone
+            self.project = nn.Sequential(
+                nn.Linear(feat_dim, 256),
+                nn.ReLU(),
+                nn.Linear(256, 128),
+            )
             self.ai_head = nn.Linear(feat_dim, 1)
             self.lang_head = nn.Linear(feat_dim, lang_count)
             self.multi_head = nn.Linear(feat_dim, 1)
 
         def forward(self, x):
             feats = self.backbone(x)
-            return feats, self.ai_head(feats), self.lang_head(feats), self.multi_head(feats)
+            proj = self.project(feats)
+            return feats, proj, self.ai_head(feats), self.lang_head(feats), self.multi_head(feats)
 
     return MultiHead()
 
@@ -127,7 +133,7 @@ def main():
                 chunk = F.pad(chunk, (0, pad))
             mel = compute_logmel(chunk, sr, n_mels, nfft, hop)
             mel = mel.unsqueeze(0).to(device)
-            _, ai_logits, lang_logits, multi_logits = model(mel)
+            _, _, ai_logits, lang_logits, multi_logits = model(mel)
             ai_probs.append(torch.sigmoid(ai_logits).item())
             lang_probs.append(torch.softmax(lang_logits, dim=1).squeeze(0))
             multi_probs.append(torch.sigmoid(multi_logits).item())
