@@ -147,7 +147,7 @@ const classifyFeatures = (featureObject) => {
   }
 
   const aiEvidenceCount = countAiEvidenceGroups(featureObject.features);
-  if (fusedProbability >= 0.5 && aiEvidenceCount < 2) {
+  if (fusedProbability >= 0.5 && aiEvidenceCount < 1) {
     fusedProbability = Math.min(fusedProbability, 0.49);
   }
 

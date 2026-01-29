@@ -48,6 +48,7 @@ const detectVoiceSource = async (payload, config) => {
       explanation: explanationResult.explanation,
       languageWarning: languageWarningResult.languageWarning,
       languageWarningReason: languageWarningResult.reason || null,
+      deepScore: deepResult.ok ? deepResult.score : null,
       detectedLanguage: deepResult.ok ? deepResult.detectedLanguage : null,
       languageConfidence: deepResult.ok ? deepResult.languageConfidence : null,
     },

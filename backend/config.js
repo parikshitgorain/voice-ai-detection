@@ -78,8 +78,8 @@ const config = {
     modelPath: process.env.DEEP_MODEL_PATH || null,
     device: process.env.DEEP_MODEL_DEVICE || "cpu",
     timeoutMs: 30000,
-    fusionWeight: 0.2,
-    evidenceThreshold: 0.75,
+    fusionWeight: 0.45,
+    evidenceThreshold: 0.65,
   },
 };
 
