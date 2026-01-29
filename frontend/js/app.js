@@ -9,7 +9,7 @@ const errorEl = document.getElementById("error");
 const languageWarningEl = document.getElementById("language-warning");
 
 const API_KEY = "change-me";
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = "";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MIN_DURATION = 10;
 const MAX_DURATION = 300;
