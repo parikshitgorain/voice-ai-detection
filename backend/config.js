@@ -69,8 +69,11 @@ const config = {
     bitratesKbps: [64, 96],
   },
   deepModel: {
-    enabled: false,
-    pythonPath: process.env.DEEP_MODEL_PYTHON || "python",
+    enabled: true,
+    useMultitask: true,
+    pythonPath:
+      process.env.DEEP_MODEL_PYTHON ||
+      "/home/ec2-user/ai-voice-train-data/backend/deep/.venv/bin/python",
     scriptPath: process.env.DEEP_MODEL_SCRIPT || null,
     modelPath: process.env.DEEP_MODEL_PATH || null,
     device: process.env.DEEP_MODEL_DEVICE || "cpu",

@@ -45,14 +45,35 @@ const runPython = (pythonPath, scriptPath, args, timeoutMs = 30000) =>
 const inferDeepScore = async (audioBase64, config) => {
   const settings = config?.deepModel || {};
   if (!settings.enabled) {
-    return { ok: true, score: null };
+    return {
+      ok: true,
+      score: null,
+      detectedLanguage: null,
+      languageConfidence: null,
+      languageDistribution: null,
+      multiSpeakerScore: null,
+    };
   }
 
   const pythonPath = settings.pythonPath || "python";
   const scriptPath =
-    settings.scriptPath || path.join(__dirname, "..", "..", "deep", "infer_deep.py");
+    settings.scriptPath ||
+    path.join(
+      __dirname,
+      "..",
+      "..",
+      "deep",
+      settings.useMultitask ? "infer_multitask.py" : "infer_deep.py"
+    );
   const modelPath =
-    settings.modelPath || path.join(__dirname, "..", "..", "deep", "model.pt");
+    settings.modelPath ||
+    path.join(
+      __dirname,
+      "..",
+      "..",
+      "deep",
+      settings.useMultitask ? "multitask_English.pt" : "model.pt"
+    );
   const device = settings.device || "cpu";
   const timeoutMs = settings.timeoutMs || 30000;
 
@@ -71,10 +92,49 @@ const inferDeepScore = async (audioBase64, config) => {
     );
 
     const parsed = JSON.parse(output);
-    if (!parsed || !Number.isFinite(parsed.deepScore)) {
+    if (!parsed || typeof parsed !== "object") {
       return { ok: false, error: new Error("Deep model output invalid.") };
     }
-    return { ok: true, score: parsed.deepScore };
+
+    if (Number.isFinite(parsed.deepScore)) {
+      return {
+        ok: true,
+        score: parsed.deepScore,
+        detectedLanguage: null,
+        languageConfidence: null,
+        languageDistribution: null,
+        multiSpeakerScore: null,
+      };
+    }
+
+    if (!Number.isFinite(parsed.aiScore)) {
+      return { ok: false, error: new Error("Deep model output invalid.") };
+    }
+
+    let detectedLanguage = null;
+    let languageConfidence = null;
+    let languageDistribution = null;
+    if (parsed.languageDistribution && typeof parsed.languageDistribution === "object") {
+      const entries = Object.entries(parsed.languageDistribution).filter(([, v]) =>
+        Number.isFinite(v)
+      );
+      if (entries.length) {
+        entries.sort((a, b) => b[1] - a[1]);
+        [detectedLanguage, languageConfidence] = entries[0];
+        languageDistribution = parsed.languageDistribution;
+      }
+    }
+
+    return {
+      ok: true,
+      score: parsed.aiScore,
+      detectedLanguage,
+      languageConfidence,
+      languageDistribution,
+      multiSpeakerScore: Number.isFinite(parsed.multiSpeakerScore)
+        ? parsed.multiSpeakerScore
+        : null,
+    };
   } catch (err) {
     return { ok: false, error: err };
   } finally {

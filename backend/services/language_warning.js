@@ -127,14 +127,35 @@ const estimateLanguageDistribution = (features) => {
   return { distribution };
 };
 
-const computeLanguageWarning = (features, selectedLanguage) => {
+const computeLanguageWarning = (
+  features,
+  selectedLanguage,
+  detectedLanguage = null,
+  detectedConfidence = null
+) => {
   if (!selectedLanguage) return { languageWarning: false };
+
+  if (
+    detectedLanguage &&
+    detectedLanguage !== selectedLanguage &&
+    Number.isFinite(detectedConfidence) &&
+    detectedConfidence >= 0.7
+  ) {
+    return {
+      languageWarning: true,
+      reason: `Selected language "${selectedLanguage}" may be incorrect. Detected "${detectedLanguage}".`,
+    };
+  }
+
   const estimate = estimateLanguage(features);
   if (!estimate.language || estimate.confidence < 0.7) {
     return { languageWarning: false };
   }
   if (estimate.language !== selectedLanguage) {
-    return { languageWarning: true };
+    return {
+      languageWarning: true,
+      reason: `Selected language "${selectedLanguage}" may be incorrect. Detected "${estimate.language}".`,
+    };
   }
   return { languageWarning: false };
 };

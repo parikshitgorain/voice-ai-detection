@@ -33,6 +33,12 @@ const detectVoiceSource = async (payload, config) => {
     confidenceScore: classificationResult.data.confidenceScore,
     features: featureResult.data.features,
   });
+  const languageWarningResult = computeLanguageWarning(
+    featureResult.data.features,
+    payload.language,
+    deepResult.ok ? deepResult.detectedLanguage : null,
+    deepResult.ok ? deepResult.languageConfidence : null
+  );
 
   return {
     ok: true,
@@ -40,10 +46,10 @@ const detectVoiceSource = async (payload, config) => {
       classification: classificationResult.data.classification,
       confidenceScore: classificationResult.data.confidenceScore,
       explanation: explanationResult.explanation,
-      languageWarning: computeLanguageWarning(
-        featureResult.data.features,
-        payload.language
-      ).languageWarning,
+      languageWarning: languageWarningResult.languageWarning,
+      languageWarningReason: languageWarningResult.reason || null,
+      detectedLanguage: deepResult.ok ? deepResult.detectedLanguage : null,
+      languageConfidence: deepResult.ok ? deepResult.languageConfidence : null,
     },
   };
 };

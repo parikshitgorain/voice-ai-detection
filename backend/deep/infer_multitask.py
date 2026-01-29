@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
+import soundfile as sf
 import torchvision
 
 
@@ -35,7 +36,11 @@ def build_model(arch, lang_count):
 
 
 def load_audio(path, sr):
-    wav, orig_sr = torchaudio.load(path)
+    try:
+        wav, orig_sr = torchaudio.load(path)
+    except Exception:
+        data, orig_sr = sf.read(path, dtype="float32", always_2d=True)
+        wav = torch.from_numpy(data.T)
     if wav.size(0) > 1:
         wav = torch.mean(wav, dim=0, keepdim=True)
     if orig_sr != sr:

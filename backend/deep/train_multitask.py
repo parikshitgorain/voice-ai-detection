@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
+import soundfile as sf
 import torchvision
 from torch.utils.data import Dataset, DataLoader
 
@@ -58,6 +59,7 @@ class MultiTaskDataset(Dataset):
         n_mels,
         n_fft,
         hop_length,
+        filter_languages=False,
     ):
         self.sample_rate = sample_rate
         self.segment_samples = int(segment_seconds * sample_rate)
@@ -73,8 +75,13 @@ class MultiTaskDataset(Dataset):
         self.records = []
         for label, root in [(1, ai_root), (0, human_root)]:
             files = list_audio_files(root)
+            print(f"scanned {len(files)} files under {root}")
             for path in files:
                 lang = infer_language_from_path(path, languages)
+                if filter_languages and not lang:
+                    continue
+                if filter_languages and lang not in self.lang_to_id:
+                    continue
                 lang_id = self.lang_to_id.get(lang) if lang else -1
                 multi_label = infer_multi_label(path)
                 self.records.append((path, label, lang_id, multi_label))
@@ -94,7 +101,11 @@ class MultiTaskDataset(Dataset):
         return len(self.records)
 
     def _load(self, path):
-        wav, sr = torchaudio.load(path)
+        try:
+            wav, sr = torchaudio.load(path)
+        except Exception:
+            data, sr = sf.read(path, dtype="float32", always_2d=True)
+            wav = torch.from_numpy(data.T)
         if wav.size(0) > 1:
             wav = torch.mean(wav, dim=0, keepdim=True)
         if sr != self.sample_rate:
@@ -119,12 +130,31 @@ class MultiTaskDataset(Dataset):
         return mel_db
 
     def __getitem__(self, idx):
-        path, ai_label, lang_id, multi_label = self.records[idx]
-        wav = self._load(path)
-        seg_a = self._segment(wav)
-        seg_b = self._segment(wav)
-        mel_a = self._make_mel(seg_a)
-        mel_b = self._make_mel(seg_b)
+        attempts = 0
+        last_err = None
+        while attempts < 3:
+            path, ai_label, lang_id, multi_label = self.records[idx]
+            try:
+                wav = self._load(path)
+                seg_a = self._segment(wav)
+                seg_b = self._segment(wav)
+                mel_a = self._make_mel(seg_a)
+                mel_b = self._make_mel(seg_b)
+                return (
+                    mel_a,
+                    mel_b,
+                    torch.tensor(ai_label, dtype=torch.float32),
+                    torch.tensor(lang_id, dtype=torch.long),
+                    torch.tensor(multi_label, dtype=torch.float32),
+                )
+            except Exception as exc:
+                last_err = exc
+                attempts += 1
+                idx = random.randint(0, len(self.records) - 1)
+        # Fallback to a zero sample to avoid crashing on bad files.
+        mel_shape = (1, self.n_mels, max(1, self.segment_samples // self.hop_length + 1))
+        mel_a = torch.zeros(mel_shape, dtype=torch.float32)
+        mel_b = torch.zeros(mel_shape, dtype=torch.float32)
         return (
             mel_a,
             mel_b,
@@ -261,14 +291,21 @@ def main():
     parser.add_argument("--nfft", type=int, default=400)
     parser.add_argument("--hop", type=int, default=160)
     parser.add_argument("--workers", type=int, default=2)
+    parser.add_argument("--log-interval", type=int, default=200)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--arch", default="resnet18")
+    parser.add_argument("--languages", default="", help="Comma-separated language list to include.")
     args = parser.parse_args()
 
     seed_all(args.seed)
     device = torch.device(args.device)
 
-    languages = ["Tamil", "English", "Hindi", "Malayalam", "Telugu"]
+    if args.languages:
+        languages = [lang.strip() for lang in args.languages.split(",") if lang.strip()]
+        filter_languages = True
+    else:
+        languages = ["Tamil", "English", "Hindi", "Malayalam", "Telugu"]
+        filter_languages = False
 
     train_ds = MultiTaskDataset(
         args.data,
@@ -279,6 +316,7 @@ def main():
         args.mels,
         args.nfft,
         args.hop,
+        filter_languages=filter_languages,
     )
     val_ds = MultiTaskDataset(
         args.data,
@@ -289,6 +327,7 @@ def main():
         args.mels,
         args.nfft,
         args.hop,
+        filter_languages=filter_languages,
     )
 
     if len(train_ds) == 0:
@@ -303,6 +342,20 @@ def main():
 
     scheduler = AugmentScheduler()
 
+    print(
+        json.dumps(
+            {
+                "status": "dataset_ready",
+                "train_records": len(train_ds),
+                "val_records": len(val_ds),
+                "batch_size": args.batch,
+                "train_batches": len(train_loader),
+                "val_batches": len(val_loader),
+                "languages": languages,
+            }
+        )
+    )
+
     best_val = -1
     start = time.time()
 
@@ -310,8 +363,10 @@ def main():
         model.train()
         total_loss = 0.0
         time_mask, freq_mask = scheduler.params(epoch, args.epochs)
+        epoch_start = time.time()
+        total_batches = max(len(train_loader), 1)
 
-        for mel_a, mel_b, ai_label, lang_id, multi_label in train_loader:
+        for step, (mel_a, mel_b, ai_label, lang_id, multi_label) in enumerate(train_loader, 1):
             mel_a = mel_a.to(device)
             mel_b = mel_b.to(device)
             ai_label = ai_label.to(device)
@@ -357,6 +412,22 @@ def main():
             scaler.step(optimizer)
             scaler.update()
             total_loss += loss.item()
+            if args.log_interval > 0 and step % args.log_interval == 0:
+                pct = round(100 * step / total_batches, 2)
+                elapsed = time.time() - epoch_start
+                rate = step / max(elapsed, 1e-6)
+                eta = (total_batches - step) / max(rate, 1e-6)
+                print(
+                    json.dumps(
+                        {
+                            "epoch": epoch + 1,
+                            "progress_pct": pct,
+                            "batches_done": int(step),
+                            "batches_total": int(total_batches),
+                            "eta_seconds": round(eta, 1),
+                        }
+                    )
+                )
 
         avg_loss = total_loss / max(len(train_loader), 1)
         metrics = evaluate(model, val_loader, device)

@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
+import soundfile as sf
 import torchvision
 from torch.utils.data import Dataset, DataLoader
 
@@ -51,7 +52,11 @@ class AudioDataset(Dataset):
         return len(self.files)
 
     def _load(self, path):
-        wav, sr = torchaudio.load(path)
+        try:
+            wav, sr = torchaudio.load(path)
+        except Exception:
+            data, sr = sf.read(path, dtype="float32", always_2d=True)
+            wav = torch.from_numpy(data.T)
         if wav.size(0) > 1:
             wav = torch.mean(wav, dim=0, keepdim=True)
         if sr != self.sample_rate:
@@ -70,9 +75,23 @@ class AudioDataset(Dataset):
         return wav[:, start : start + self.segment_samples]
 
     def __getitem__(self, idx):
-        path = self.files[idx]
-        wav = self._load(path)
-        wav = self._segment(wav)
+        attempts = 0
+        last_err = None
+        while attempts < 3:
+            path = self.files[idx]
+            try:
+                wav = self._load(path)
+                wav = self._segment(wav)
+                mel = self.mel(wav)
+                mel_db = self.amplitude_to_db(mel)
+                mel_db = (mel_db - mel_db.mean()) / (mel_db.std() + 1e-6)
+                return mel_db, torch.tensor(self.label, dtype=torch.float32)
+            except Exception as exc:
+                last_err = exc
+                attempts += 1
+                idx = random.randint(0, len(self.files) - 1)
+        # Fallback to a zero sample to avoid crashing on bad files.
+        wav = torch.zeros(1, self.segment_samples, dtype=torch.float32)
         mel = self.mel(wav)
         mel_db = self.amplitude_to_db(mel)
         mel_db = (mel_db - mel_db.mean()) / (mel_db.std() + 1e-6)
