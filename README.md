@@ -141,6 +141,15 @@ Error response:
 Model weights live in `backend/deep/*.pt` and are tracked via Git LFS.
 If you remove LFS, store weights externally and document download steps.
 
+## Training Details (Truthful)
+- Training was performed on a VPS (cloud server).
+- VPS specs: 4 vCPU (Intel Xeon Platinum 8259CL), 15 GiB RAM, NVIDIA Tesla T4 (16 GB VRAM).
+- Data source: Hugging Face datasets.
+- Total audio used: ~100 GB combined (AI + human).
+- Per language: ~10 GB AI + ~10 GB human for Tamil, English, Hindi, Malayalam, Telugu.
+- Per-language models were trained.
+- Training time: ~1 day (~24 hours).
+
 ## Privacy
 Audio is processed transiently and deleted after analysis. No audio is stored or tied to user identity.
 
