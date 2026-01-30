@@ -2,12 +2,12 @@
 
 This directory structure is final and should remain stable.
 
-- `audio_loader/` Base64 decode + MP3 to PCM decoding + duration
-- `feature_extractor/` Frame-based feature extraction + aggregation
-- `audio_types/` Feature schema helpers
-- `audio_pipeline.js` Orchestration of loading + feature extraction
-- `vad/` Speech presence detection gate (WebRTC VAD)
+Active in the strict evaluation path:
 - `deep_model/` Deep-model inference bridge (Python)
-- `language_warning.js` Language mismatch warning (selected vs detected)
+- `voice_detection_service.js` Orchestration for AI vs Human scoring
+
+Present but not used in the strict evaluation path:
+- `audio_loader/`, `feature_extractor/`, `audio_types/`, `audio_pipeline.js`, `vad/`,
+  `language_warning.js`
 
 Do not move files or merge responsibilities without an explicit design change.

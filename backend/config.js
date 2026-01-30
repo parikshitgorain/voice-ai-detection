@@ -94,7 +94,7 @@ const config = {
     pythonPath: process.env.DEEP_MODEL_PYTHON || defaultPythonPath,
     scriptPath: process.env.DEEP_MODEL_SCRIPT || null,
     modelPath: process.env.DEEP_MODEL_PATH || null,
-    device: process.env.DEEP_MODEL_DEVICE || "cuda",
+    device: process.env.DEEP_MODEL_DEVICE || "cpu",
     timeoutMs: 30000,
     classifyThreshold: 0.5,
     fusionWeight: 0.45,

@@ -7,17 +7,16 @@ Production-grade system to classify uploaded audio as **HUMAN** or **AI_GENERATE
 
 ## Features
 - Multilingual detection: English, Hindi, Tamil, Malayalam, Telugu
-- Deep model inference (multitask: AI vs Human + language detection)
-- Language-gate safety (warn/soft/block on mismatch)
-- Voice activity detection (rejects non-speech)
+- AI vs Human classification from base64-encoded MP3
+- API key authentication (`x-api-key`)
 - Privacy-first: audio is processed transiently and not stored
 
 ## Architecture
 - `frontend/`: static single-page UI
-- `backend/`: Node.js API + audio pipeline + deep model integration
+- `backend/`: Node.js API + deep model integration
 - `backend/deep/`: Python inference code + model weights
 
-## Requirements
+## Requirements (CPU VPS)
 - Node.js 18+
 - Python 3.9+
 - ffmpeg + ffprobe available on PATH
@@ -27,9 +26,11 @@ Production-grade system to classify uploaded audio as **HUMAN** or **AI_GENERATE
 cd backend
 npm install
 
-# Python venv for deep model
+# Python venv for deep model (CPU)
 python3 -m venv deep/.venv
 ./deep/.venv/bin/pip install -r deep/requirements.txt
+# If torch/torchaudio need CPU wheels explicitly:
+# ./deep/.venv/bin/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Run API
 node server.js
@@ -85,14 +86,12 @@ server {
 Backend config (see `backend/config.js`):
 - `VOICE_DETECT_API_KEY` (required; API requests must include `x-api-key`)
 - `DEEP_MODEL_PATH` (single multilingual model)
-- `DEEP_MODEL_DEVICE` (default: `cuda`)
+- `DEEP_MODEL_DEVICE` (default: `cpu`)
 - `DEEP_MODEL_PYTHON` (default: auto-detects `backend/deep/.venv/bin/python`, else `python3`)
 - Optional per-language models:
   - `DEEP_MODEL_PATH_ENGLISH`, `DEEP_MODEL_PATH_HINDI`, `DEEP_MODEL_PATH_TAMIL`,
     `DEEP_MODEL_PATH_MALAYALAM`, `DEEP_MODEL_PATH_TELUGU`
-- Optional language detector:
-  - `DEEP_LANG_MODEL_PATH`, `DEEP_LANG_MODEL_DEVICE`
- - `CORS_ORIGINS` (comma-separated list for non-same-origin clients; default allows localhost in dev)
+- `CORS_ORIGINS` (comma-separated list for non-same-origin clients; default allows localhost in dev)
 
 ## API
 `POST /api/voice-detection`

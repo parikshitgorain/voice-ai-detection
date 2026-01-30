@@ -1,4 +1,4 @@
-# Deep Model (Inference & Optional Training)
+# Deep Model (Inference)
 
 This folder contains the Python model code used by the API for inference.
 
@@ -7,6 +7,8 @@ Create venv and install requirements:
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+# If torch/torchaudio need CPU wheels explicitly:
+# .venv/bin/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
 ```
 
 Run inference on a file:
@@ -22,14 +24,4 @@ Run inference on a file:
 
 For public GitHub repos, store weights with Git LFS or provide download instructions.
 
-## Optional Training (GPU)
-```bash
-.venv/bin/python train_multitask.py \
-  --data ../data \
-  --languages "English,Hindi,Tamil,Malayalam,Telugu" \
-  --device cuda \
-  --balance \
-  --epochs 30 \
-  --batch 48 \
-  --out multitask_multilingual.pt
-```
+Training scripts are intentionally excluded from this deployment.
