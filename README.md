@@ -10,6 +10,7 @@ Production-grade system to classify uploaded audio as **HUMAN** or **AI_GENERATE
 - AI vs Human classification from base64-encoded MP3
 - API key authentication (`x-api-key`)
 - Privacy-first: audio is processed transiently and not stored
+- Concurrency control with queue and rate limits
 
 ## Architecture
 - `frontend/`: static single-page UI
@@ -18,8 +19,9 @@ Production-grade system to classify uploaded audio as **HUMAN** or **AI_GENERATE
 
 ## Requirements (CPU VPS)
 - Node.js 18+
-- Python 3.9+
+- Python 3.9+ (tested with 3.12)
 - ffmpeg + ffprobe available on PATH
+- Git LFS (for model weights)
 
 ## Quick Start (Local)
 ```bash
@@ -45,22 +47,58 @@ Open: `http://localhost:5173`
 
 Frontend runtime config:
 - `frontend/config.js` is loaded at runtime.
-- Edit it to set `apiBaseUrl` and `apiKey` if needed.
+- Set `apiBaseUrl` if backend is on another origin.
+- API key is NOT stored or prefilled in the UI.
 
-## Production Deploy (Nginx + API)
-1) Copy frontend to nginx web root:
-```bash
-sudo mkdir -p /var/www/voice-ai-detection
-sudo rsync -av --delete frontend/ /var/www/voice-ai-detection/
+## Production Deploy (Nginx + systemd)
+
+### 1) Backend environment
+Create `/etc/voice-ai-detection.env`:
+```
+VOICE_DETECT_API_KEY=your-secret-key
+HOST=127.0.0.1
+DEEP_MODEL_DEVICE=cpu
+DEEP_MODEL_PATH_ENGLISH=/var/www/voice-ai-detection/backend/deep/multitask_English.pt
+DEEP_MODEL_PATH_HINDI=/var/www/voice-ai-detection/backend/deep/multitask_Hindi.pt
+DEEP_MODEL_PATH_TAMIL=/var/www/voice-ai-detection/backend/deep/multitask_Tamil.pt
+DEEP_MODEL_PATH_MALAYALAM=/var/www/voice-ai-detection/backend/deep/multitask_Malayalam.pt
+DEEP_MODEL_PATH_TELUGU=/var/www/voice-ai-detection/backend/deep/multitask_Telugu.pt
+QUEUE_MAX_CONCURRENT=3
+QUEUE_MAX_LENGTH=10
 ```
 
-2) Nginx site config (example):
+### 2) Systemd service
+Example `/etc/systemd/system/voice-ai-detection.service`:
+```
+[Unit]
+Description=Voice AI Detection API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/voice-ai-detection/backend
+EnvironmentFile=/etc/voice-ai-detection.env
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now voice-ai-detection.service
+```
+
+### 3) Nginx (SSL + API proxy)
+Example server block:
 ```nginx
 server {
-    listen 80;
-    server_name _;
+    server_name voiceai.example.com;
 
-    root /var/www/voice-ai-detection;
+    root /var/www/voice-ai-detection/frontend;
     index index.html;
 
     location /api/ {
@@ -70,32 +108,31 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
     }
 
     location / {
         try_files $uri /index.html;
     }
+
+    # Optional: disable caching
+    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
+    add_header Pragma "no-cache" always;
+    add_header Expires "0" always;
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/voiceai.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/voiceai.example.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 }
 ```
 
-3) Start backend (Node). For production, use a process manager (systemd, PM2, etc.).
-
-## Environment Variables
-Backend config (see `backend/config.js`):
-- `VOICE_DETECT_API_KEY` (required; API requests must include `x-api-key`)
-- `DEEP_MODEL_PATH` (single multilingual model)
-- `DEEP_MODEL_DEVICE` (default: `cpu`)
-- `DEEP_MODEL_PYTHON` (default: auto-detects `backend/deep/.venv/bin/python`, else `python3`)
-- Optional per-language models:
-  - `DEEP_MODEL_PATH_ENGLISH`, `DEEP_MODEL_PATH_HINDI`, `DEEP_MODEL_PATH_TAMIL`,
-    `DEEP_MODEL_PATH_MALAYALAM`, `DEEP_MODEL_PATH_TELUGU`
-- `CORS_ORIGINS` (comma-separated list for non-same-origin clients; default allows localhost in dev)
+### 4) Health
+`GET /health` returns `{ "status": "ok" }`.
 
 ## API
-`POST /api/voice-detection`
 
+### POST /api/voice-detection
 Headers:
 ```
 Content-Type: application/json
@@ -111,8 +148,6 @@ Body:
 }
 ```
 
-Audio formats: `mp3` only.
-
 Success response:
 ```json
 {
@@ -124,22 +159,32 @@ Success response:
 }
 ```
 
-Error response:
-```json
-{ "status": "error", "message": "Invalid API key or malformed request" }
-```
+Error responses:
+- `404` for unauthorized or unknown routes (intentionally hides API)
+- `400` for malformed requests
+- `413` if body exceeds limits
+- `429` when rate limit is exceeded
+- `503` when the queue is full
+- `500` for internal failures
 
-## Health Check
-`GET /health` returns `{ "status": "ok" }`.
+### GET /api/queue
+- Requires `x-api-key`
+- Returns queue status `{ active, queued, maxConcurrent, maxQueue }`
+- Returns `404` if key is missing/invalid
 
-## Smoke Test
-```
-./scripts/smoke_test.sh http://localhost:3000
-```
+## Queue and Rate Limiting
+- Max concurrent requests: `QUEUE_MAX_CONCURRENT` (default 3)
+- Queue size: `QUEUE_MAX_LENGTH` (default 10)
+- Rate limit (token bucket):
+  - `maxTokens: 12`
+  - `refillPerSecond: 0.2` (about 1 request per 5 seconds after burst)
+
+## Logging
+- Request log file: `/var/log/voice-ai-detection.log`
+- Rotated daily (`/etc/logrotate.d/voice-ai-detection`)
 
 ## Model Weights
 Model weights live in `backend/deep/*.pt` and are tracked via Git LFS.
-If you remove LFS, store weights externally and document download steps.
 
 ## Training Details (Truthful)
 - Training was performed on a VPS (cloud server).
@@ -152,10 +197,6 @@ If you remove LFS, store weights externally and document download steps.
 
 ## Privacy
 Audio is processed transiently and deleted after analysis. No audio is stored or tied to user identity.
-
-## Sponsorship
-If you want to sponsor development or request enterprise support, contact:
-parikshitgorain@yahoo.com
 
 ## License
 MIT License. See `LICENSE`.

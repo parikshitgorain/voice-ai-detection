@@ -37,6 +37,10 @@ const config = {
     maxTokens: 12,
     refillPerSecond: 0.2,
   },
+  queue: {
+    maxConcurrent: Number.parseInt(process.env.QUEUE_MAX_CONCURRENT, 10) || 3,
+    maxQueue: Number.parseInt(process.env.QUEUE_MAX_LENGTH, 10) || 10,
+  },
   replayCache: {
     ttlMs: 5 * 60 * 1000,
     maxEntries: 2000,

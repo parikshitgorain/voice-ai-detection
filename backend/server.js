@@ -1,9 +1,18 @@
 const http = require("http");
+const crypto = require("crypto");
 const config = require("./config");
 const { handleVoiceDetection } = require("./api/voice_detection");
+const { QueueFullError, createRequestQueue } = require("./utils/request_queue");
+const { createRateLimiter } = require("./utils/rate_limiter");
+const { isValidApiKey } = require("./utils/authentication");
+const { getClientIp } = require("./utils/client_ip");
+const { logDetection } = require("./utils/logger");
 
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "127.0.0.1";
 const STRICT_ERROR_MESSAGE = "Invalid API key or malformed request";
+const queue = createRequestQueue(config.queue || {});
+const rateLimiter = createRateLimiter(config.rateLimit || {});
 
 const buildAllowedOrigins = () => {
   const envValue = process.env.CORS_ORIGINS;
@@ -34,31 +43,84 @@ const applyCors = (req, res) => {
   res.setHeader("Access-Control-Max-Age", "600");
 };
 
-const sendNotFound = (res) => {
-  res.statusCode = 404;
+const sendJson = (res, statusCode, payload) => {
+  res.statusCode = statusCode;
   res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify({ status: "error", message: STRICT_ERROR_MESSAGE }));
+  res.end(JSON.stringify(payload));
+};
+
+const sendNotFound = (res) => {
+  sendJson(res, 404, { status: "error", message: "Not Found" });
 };
 
 const server = http.createServer((req, res) => {
   applyCors(req, res);
 
   if (req.method === "OPTIONS") {
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ status: "ok" }));
+    sendJson(res, 200, { status: "ok" });
     return;
   }
 
   if (req.method === "GET" && req.url === "/health") {
-    res.statusCode = 200;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ status: "ok" }));
+    sendJson(res, 200, { status: "ok" });
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/queue") {
+    const authOk = isValidApiKey(req.headers, config);
+    const rateKey = `${getClientIp(req)}:${authOk ? "auth" : "anon"}`;
+    if (!rateLimiter.allow(rateKey)) {
+      if (!authOk) {
+        sendNotFound(res);
+        return;
+      }
+      sendJson(res, 429, { status: "error", message: "Too many requests. Please wait." });
+      return;
+    }
+    if (!authOk) {
+      sendNotFound(res);
+      return;
+    }
+    sendJson(res, 200, { status: "ok", ...queue.getStats() });
     return;
   }
 
   if (req.method !== "POST" || req.url !== "/api/voice-detection") {
     sendNotFound(res);
+    return;
+  }
+
+  const requestId = crypto.randomUUID();
+  const clientIp = getClientIp(req);
+  req.requestId = requestId;
+  req.clientIp = clientIp;
+  req.requestReceivedAt = Date.now();
+
+  const authOk = isValidApiKey(req.headers, config);
+  const rateKey = `${clientIp}:${authOk ? "auth" : "anon"}`;
+  if (!rateLimiter.allow(rateKey)) {
+    if (!authOk) {
+      sendNotFound(res);
+    } else {
+      sendJson(res, 429, { status: "error", message: "Too many requests. Please wait." });
+    }
+    logDetection({
+      requestId,
+      ip: clientIp,
+      status: "error",
+      reason: "RATE_LIMIT",
+    });
+    return;
+  }
+
+  if (!authOk) {
+    sendNotFound(res);
+    logDetection({
+      requestId,
+      ip: clientIp,
+      status: "error",
+      reason: "INVALID_API_KEY",
+    });
     return;
   }
 
@@ -68,11 +130,13 @@ const server = http.createServer((req, res) => {
     chunks.push(chunk);
     bodySize += chunk.length;
     if (bodySize > config.limits.maxBodyBytes) {
-      res.statusCode = 413;
-      res.setHeader("Content-Type", "application/json");
-      res.end(
-        JSON.stringify({ status: "error", message: STRICT_ERROR_MESSAGE })
-      );
+      sendJson(res, 413, { status: "error", message: STRICT_ERROR_MESSAGE });
+      logDetection({
+        requestId,
+        ip: clientIp,
+        status: "error",
+        reason: "BODY_TOO_LARGE",
+      });
       req.destroy();
     }
   });
@@ -83,22 +147,73 @@ const server = http.createServer((req, res) => {
       const body = Buffer.concat(chunks).toString("utf8");
       payload = body ? JSON.parse(body) : null;
     } catch (err) {
-      res.statusCode = 400;
-      res.setHeader("Content-Type", "application/json");
-      res.end(
-        JSON.stringify({ status: "error", message: STRICT_ERROR_MESSAGE })
-      );
+      sendJson(res, 400, { status: "error", message: STRICT_ERROR_MESSAGE });
+      logDetection({
+        requestId,
+        ip: clientIp,
+        status: "error",
+        reason: "INVALID_JSON",
+      });
       return;
     }
 
-    handleVoiceDetection(req, res, payload, config).catch(() => {
-      res.statusCode = 500;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ status: "error", message: "Processing failed. Please retry." }));
-    });
+    const task = () =>
+      handleVoiceDetection(req, res, payload, config).catch((err) => {
+        if (!res.headersSent) {
+          sendJson(res, 500, { status: "error", message: "Processing failed. Please retry." });
+        }
+        logDetection({
+          requestId,
+          ip: clientIp,
+          status: "error",
+          reason: "UNHANDLED_ERROR",
+          detail: err && err.message ? err.message : "unknown",
+        });
+      });
+
+    try {
+      queue.enqueue({ id: requestId, task, req, onError: (err) => {
+        if (!res.headersSent) {
+          sendJson(res, 500, { status: "error", message: "Processing failed. Please retry." });
+        }
+        logDetection({
+          requestId,
+          ip: clientIp,
+          status: "error",
+          reason: "QUEUE_TASK_ERROR",
+          detail: err && err.message ? err.message : "unknown",
+        });
+      }});
+    } catch (err) {
+      if (err instanceof QueueFullError || err.code === "QUEUE_FULL") {
+        const queueStats = queue.getStats();
+        sendJson(res, 503, {
+          status: "error",
+          message: `Queue is full. Please wait. Users in queue: ${queueStats.queued}.`,
+        });
+        logDetection({
+          requestId,
+          ip: clientIp,
+          status: "error",
+          reason: "QUEUE_FULL",
+          queued: queueStats.queued,
+          active: queueStats.active,
+        });
+        return;
+      }
+
+      sendJson(res, 500, { status: "error", message: "Processing failed. Please retry." });
+      logDetection({
+        requestId,
+        ip: clientIp,
+        status: "error",
+        reason: "QUEUE_INIT_ERROR",
+        detail: err && err.message ? err.message : "unknown",
+      });
+    }
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   console.log(`Voice detection API listening on port ${PORT}`);
 });

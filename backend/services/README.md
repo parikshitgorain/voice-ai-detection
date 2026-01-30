@@ -1,13 +1,12 @@
-# Services Structure (Locked)
+# Services
 
-This directory structure is final and should remain stable.
+Core processing pipeline for voice detection.
 
-Active in the strict evaluation path:
-- `deep_model/` Deep-model inference bridge (Python)
-- `voice_detection_service.js` Orchestration for AI vs Human scoring
+## Active modules
+- `deep_model/`: Python inference bridge
+- `voice_detection_service.js`: orchestrates model inference
 
-Present but not used in the strict evaluation path:
-- `audio_loader/`, `feature_extractor/`, `audio_types/`, `audio_pipeline.js`, `vad/`,
-  `language_warning.js`
+## Supporting modules
+- `audio_loader/`, `feature_extractor/`, `audio_pipeline.js`, `vad/`
 
-Do not move files or merge responsibilities without an explicit design change.
+Keep structure stable unless you change the architecture.

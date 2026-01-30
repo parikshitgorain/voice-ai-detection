@@ -28,34 +28,50 @@ const allowedMessages = [STRICT_ERROR_MESSAGE];
 
 const loadingMessages = ["Uploading audio", "Analyzing voice patterns", "Generating decision"];
 let loadingTimers = [];
+let queueStatusText = "";
 
 const clearLoadingTimers = () => {
   loadingTimers.forEach((timer) => clearTimeout(timer));
   loadingTimers = [];
 };
 
+const setQueueStatus = (text) => {
+  queueStatusText = text || "";
+  if (!queueStatusText) return;
+  clearLoadingTimers();
+  if (loadingText) loadingText.textContent = queueStatusText;
+};
+
+const clearAutofill = () => {
+  if (!apiKeyInput) return;
+  if (document.activeElement === apiKeyInput) return;
+  if (apiKeyInput.value) apiKeyInput.value = "";
+};
+
 const loadApiKey = () => {
   if (!apiKeyInput) return;
-  const saved = localStorage.getItem(API_KEY_STORAGE);
-  if (saved) {
-    apiKeyInput.value = saved;
-  } else if (EFFECTIVE_DEFAULT_KEY) {
-    apiKeyInput.value = EFFECTIVE_DEFAULT_KEY;
+  // Do not prefill API keys; always start blank.
+  apiKeyInput.value = "";
+  try {
+    localStorage.removeItem(API_KEY_STORAGE);
+  } catch (err) {
+    // ignore storage errors
   }
+  clearAutofill();
+  setTimeout(clearAutofill, 300);
+  setTimeout(clearAutofill, 1500);
 };
 
 const persistApiKey = () => {
-  if (!apiKeyInput) return;
-  const value = apiKeyInput.value.trim();
-  if (value) {
-    localStorage.setItem(API_KEY_STORAGE, value);
-  } else {
-    localStorage.removeItem(API_KEY_STORAGE);
-  }
+  // Disabled: do not store API keys in browser storage.
 };
 
 const startLoadingCycle = () => {
   clearLoadingTimers();
+  if (queueStatusText) {
+    if (loadingText) loadingText.textContent = queueStatusText;
+    return;
+  }
   if (loadingText) loadingText.textContent = loadingMessages[0];
   loadingTimers.push(
     setTimeout(() => {
@@ -76,6 +92,7 @@ const setLoading = (isLoading) => {
     startLoadingCycle();
   } else {
     clearLoadingTimers();
+    queueStatusText = "";
     if (loadingText) loadingText.textContent = "Analyzing voice patterns";
   }
 };
@@ -120,7 +137,32 @@ const updateOutput = (payload) => {
 
 const mapUserMessage = (message) => {
   if (allowedMessages.includes(message)) return message;
+  if (typeof message === "string" && message.startsWith("Queue is full")) return message;
   return STRICT_ERROR_MESSAGE;
+};
+
+const fetchQueueStatus = async () => {
+  try {
+    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
+    const finalApiKey = apiKey || EFFECTIVE_DEFAULT_KEY;
+    if (!finalApiKey) return;
+    const response = await fetch(`${API_BASE_URL}/api/queue`, {
+      headers: {
+        "x-api-key": finalApiKey,
+      },
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    if (!payload || typeof payload !== "object") return;
+    const queued = Number(payload.queued || 0);
+    const active = Number(payload.active || 0);
+    const maxConcurrent = Number(payload.maxConcurrent || 3);
+    if (queued > 0 || active >= maxConcurrent) {
+      setQueueStatus(`Queue: ${queued} waiting`);
+    }
+  } catch (err) {
+    // ignore queue status failures
+  }
 };
 
 const validateForm = () => {
@@ -212,6 +254,7 @@ form.addEventListener("submit", async (event) => {
 
   setLoading(true);
   resetOutput();
+  await fetchQueueStatus();
 
   try {
     const file = fileInput.files && fileInput.files.length === 1 ? fileInput.files[0] : null;
