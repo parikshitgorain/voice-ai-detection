@@ -5,3 +5,6 @@ Serve locally with:
 ```
 python -m http.server 5173 --directory frontend
 ```
+
+Runtime config:
+Edit `config.js` to set `apiBaseUrl` and `apiKey` if needed.

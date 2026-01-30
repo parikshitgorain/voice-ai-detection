@@ -42,7 +42,7 @@ const runPython = (pythonPath, scriptPath, args, timeoutMs = 30000) =>
     });
   });
 
-const inferDeepScore = async (audioBase64, config) => {
+const inferDeepScore = async (audioBase64, config, selectedLanguage = null, audioFormat = null) => {
   const settings = config?.deepModel || {};
   if (!settings.enabled) {
     return {
@@ -65,24 +65,74 @@ const inferDeepScore = async (audioBase64, config) => {
       "deep",
       settings.useMultitask ? "infer_multitask.py" : "infer_deep.py"
     );
-  const modelPath =
+  let modelPath =
     settings.modelPath ||
     path.join(
       __dirname,
       "..",
       "..",
       "deep",
-      settings.useMultitask ? "multitask_English.pt" : "model.pt"
+      settings.useMultitask ? "multitask_multilingual.pt" : "model.pt"
     );
+  if (settings.modelByLanguage) {
+    if (!selectedLanguage) {
+      return {
+        ok: false,
+        error: new Error("Language is required when using per-language models."),
+      };
+    }
+    const mapped = settings.modelByLanguage[selectedLanguage];
+    if (!mapped) {
+      return {
+        ok: false,
+        error: new Error(`No model configured for language "${selectedLanguage}".`),
+      };
+    }
+    modelPath = mapped;
+  }
   const device = settings.device || "cpu";
   const timeoutMs = settings.timeoutMs || 30000;
 
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "voice-deep-"));
-  const tempFile = path.join(tempDir, `audio-${crypto.randomBytes(8).toString("hex")}.mp3`);
+  const safeFormat =
+    typeof audioFormat === "string" ? audioFormat.trim().toLowerCase() : null;
+  const ext =
+    safeFormat && safeFormat !== "auto" && /^[a-z0-9]+$/.test(safeFormat)
+      ? `.${safeFormat}`
+      : ".mp3";
+  const tempFile = path.join(tempDir, `audio-${crypto.randomBytes(8).toString("hex")}${ext}`);
 
   try {
     const buffer = Buffer.from(audioBase64, "base64");
     await fs.writeFile(tempFile, buffer);
+
+    let detectedLanguage = null;
+    let languageConfidence = null;
+    let languageDistribution = null;
+    const languageDetector = settings.languageDetector || {};
+    if (languageDetector.enabled && languageDetector.modelPath) {
+      const langScript =
+        languageDetector.scriptPath ||
+        path.join(__dirname, "..", "..", "deep", "infer_multitask.py");
+      const langDevice = languageDetector.device || device;
+      const langOutput = await runPython(
+        pythonPath,
+        langScript,
+        ["--audio", tempFile, "--model", languageDetector.modelPath, "--device", langDevice],
+        timeoutMs
+      );
+      const langParsed = JSON.parse(langOutput);
+      if (langParsed && typeof langParsed === "object" && langParsed.languageDistribution) {
+        const entries = Object.entries(langParsed.languageDistribution).filter(([, v]) =>
+          Number.isFinite(v)
+        );
+        if (entries.length) {
+          entries.sort((a, b) => b[1] - a[1]);
+          [detectedLanguage, languageConfidence] = entries[0];
+          languageDistribution = langParsed.languageDistribution;
+        }
+      }
+    }
 
     const output = await runPython(
       pythonPath,
@@ -100,9 +150,9 @@ const inferDeepScore = async (audioBase64, config) => {
       return {
         ok: true,
         score: parsed.deepScore,
-        detectedLanguage: null,
-        languageConfidence: null,
-        languageDistribution: null,
+        detectedLanguage,
+        languageConfidence,
+        languageDistribution,
         multiSpeakerScore: null,
       };
     }
@@ -111,10 +161,7 @@ const inferDeepScore = async (audioBase64, config) => {
       return { ok: false, error: new Error("Deep model output invalid.") };
     }
 
-    let detectedLanguage = null;
-    let languageConfidence = null;
-    let languageDistribution = null;
-    if (parsed.languageDistribution && typeof parsed.languageDistribution === "object") {
+    if (!languageDistribution && parsed.languageDistribution) {
       const entries = Object.entries(parsed.languageDistribution).filter(([, v]) =>
         Number.isFinite(v)
       );

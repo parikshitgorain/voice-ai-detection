@@ -1,57 +1,110 @@
-# Project Structure (Locked)
+# Voice AI Detection (Human vs AI)
 
-This repository has a finalized structure. Changes to layout or service boundaries
-should only happen with an explicit design review.
+Maintainer: Parikshit Gorain
+Contact: parikshitgorain@yahoo.com
 
-Key directories:
-- `backend/` API + audio pipeline + classifier services
-- `frontend/` Single-page UI
+Production-grade system to classify uploaded audio as **HUMAN** or **AI_GENERATED** with multilingual support.
 
-For backend service boundaries, see `backend/services/README.md`.
+## Features
+- Multilingual detection: English, Hindi, Tamil, Malayalam, Telugu
+- Deep model inference (multitask: AI vs Human + language detection)
+- Language-gate safety (warn/soft/block on mismatch)
+- Voice activity detection (rejects non-speech)
+- Privacy-first: audio is processed transiently and not stored
 
-## Audio Handling & Privacy (API Contract)
-- Audio is processed transiently and deleted after analysis completes.
-- No raw audio, Base64 payloads, or PCM are stored or persisted.
-- No audio is associated with user identity.
+## Architecture
+- `frontend/`: static single-page UI
+- `backend/`: Node.js API + audio pipeline + deep model integration
+- `backend/deep/`: Python inference code + model weights
 
-## Setup (Local)
-Prereqs:
-- Node.js (backend)
+## Requirements
+- Node.js 18+
+- Python 3.9+
 - ffmpeg + ffprobe available on PATH
 
-Install backend dependencies:
-```
+## Quick Start (Local)
+```bash
 cd backend
 npm install
-```
 
-Run backend:
-```
+# Python venv for deep model
+python3 -m venv deep/.venv
+./deep/.venv/bin/pip install -r deep/requirements.txt
+
+# Run API
 node server.js
 ```
 
-Run frontend (static):
-```
-python -m http.server 5173 --directory frontend
+Serve frontend:
+```bash
+python3 -m http.server 5173 --directory frontend
 ```
 
-Note: the frontend posts to `http://localhost:3000/api/voice-detection`, so the
-backend must be running. CORS is enabled for `http://localhost:5173` in dev.
+Open: `http://localhost:5173`
 
-## API Contract (JSON Only)
-Endpoint:
+Frontend runtime config:
+- `frontend/config.js` is loaded at runtime.
+- Edit it to set `apiBaseUrl` and `apiKey` if needed.
+
+## Production Deploy (Nginx + API)
+1) Copy frontend to nginx web root:
+```bash
+sudo mkdir -p /var/www/voice-ai-detection
+sudo rsync -av --delete frontend/ /var/www/voice-ai-detection/
 ```
-POST /api/voice-detection
+
+2) Nginx site config (example):
+```nginx
+server {
+    listen 80;
+    server_name _;
+
+    root /var/www/voice-ai-detection;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location / {
+        try_files $uri /index.html;
+    }
+}
 ```
+
+3) Start backend (Node). For production, use a process manager (systemd, PM2, etc.).
+
+## Environment Variables
+Backend config (see `backend/config.js`):
+- `VOICE_DETECT_API_KEY` (required; API requests must include `x-api-key`)
+- `DEEP_MODEL_PATH` (single multilingual model)
+- `DEEP_MODEL_DEVICE` (default: `cuda`)
+- `DEEP_MODEL_PYTHON` (default: auto-detects `backend/deep/.venv/bin/python`, else `python3`)
+- Optional per-language models:
+  - `DEEP_MODEL_PATH_ENGLISH`, `DEEP_MODEL_PATH_HINDI`, `DEEP_MODEL_PATH_TAMIL`,
+    `DEEP_MODEL_PATH_MALAYALAM`, `DEEP_MODEL_PATH_TELUGU`
+- Optional language detector:
+  - `DEEP_LANG_MODEL_PATH`, `DEEP_LANG_MODEL_DEVICE`
+ - `CORS_ORIGINS` (comma-separated list for non-same-origin clients; default allows localhost in dev)
+
+## API
+`POST /api/voice-detection`
 
 Headers:
 ```
-x-api-key: <key>
 Content-Type: application/json
+x-api-key: <key>
 ```
 
 Body:
-```
+```json
 {
   "language": "English",
   "audioFormat": "mp3",
@@ -59,44 +112,44 @@ Body:
 }
 ```
 
+Audio formats: `mp3` only.
+
 Success response:
-```
+```json
 {
-  "classification": "AI_GENERATED" | "HUMAN",
-  "confidenceScore": 0.0,
-  "explanation": "Short technical explanation",
+  "classification": "AI_GENERATED",
+  "confidenceScore": 0.93,
+  "explanation": "Deep model estimated an AI probability of 93%.",
   "languageWarning": false,
-  "languageWarningReason": "Selected language \"Hindi\" may be incorrect. Detected \"Tamil\".",
-  "detectedLanguage": "Hindi",
-  "languageConfidence": 0.82
+  "languageWarningReason": null,
+  "detectedLanguage": "English",
+  "languageConfidence": 0.86
 }
 ```
 
-Error response (always JSON):
-```
-{
-  "status": "error",
-  "message": "Audio could not be processed. Please try another file."
-}
+Error response:
+```json
+{ "status": "error", "message": "Audio could not be processed." }
 ```
 
-## Speech-Presence Gate (VAD)
-- Non-speech audio is rejected before classification.
-- VAD is implemented with WebRTC VAD compiled to WebAssembly
-  (`@ennuicastr/webrtcvad.js`) to avoid native build issues.
+## Health Check
+`GET /health` returns `{ "status": "ok" }`.
 
-## Deep Model (Multitask)
-The backend can fuse a deep model score into the final decision. The default
-deep model path can be overridden via `DEEP_MODEL_PATH`.
+## Smoke Test
+```
+./scripts/smoke_test.sh http://localhost:3000
+```
 
-Trained model artifacts (included in this repo):
-- `backend/deep/multitask_English.pt`
-- `backend/deep/multitask_Hindi.pt`
-- `backend/deep/multitask_Tamil.pt`
-- `backend/deep/multitask_Malayalam.pt`
-- `backend/deep/multitask_Telugu.pt`
+## Model Weights
+Model weights live in `backend/deep/*.pt` and are tracked via Git LFS.
+If you remove LFS, store weights externally and document download steps.
 
-Runtime requirements (for inference):
-- Python 3.9+
-- `backend/deep/.venv` created and installed via
-  `pip install -r backend/deep/requirements.txt`
+## Privacy
+Audio is processed transiently and deleted after analysis. No audio is stored or tied to user identity.
+
+## Sponsorship
+If you want to sponsor development or request enterprise support, contact:
+parikshitgorain@yahoo.com
+
+## License
+MIT License. See `LICENSE`.

@@ -20,7 +20,10 @@ const validateRequest = (payload, config) => {
   if (!isNonEmptyString(payload.audioFormat)) {
     return { code: "FORMAT_REQUIRED", message: "audioFormat is required." };
   }
-  if (payload.audioFormat !== config.audioFormat) {
+  const allowedFormats = Array.isArray(config.audioFormats)
+    ? config.audioFormats
+    : [config.audioFormat].filter(Boolean);
+  if (allowedFormats.length && !allowedFormats.includes(payload.audioFormat)) {
     return { code: "UNSUPPORTED_FORMAT", message: "Unsupported audio format." };
   }
   if (!isNonEmptyString(payload.audioBase64)) {

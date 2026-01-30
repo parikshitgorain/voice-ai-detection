@@ -4,10 +4,23 @@ const { handleVoiceDetection } = require("./api/voice_detection");
 
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigins = new Set([
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-]);
+const buildAllowedOrigins = () => {
+  const envValue = process.env.CORS_ORIGINS;
+  if (envValue) {
+    return new Set(
+      envValue
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    );
+  }
+  if (process.env.NODE_ENV !== "production") {
+    return new Set(["http://localhost:5173", "http://127.0.0.1:5173"]);
+  }
+  return new Set();
+};
+
+const allowedOrigins = buildAllowedOrigins();
 
 const applyCors = (req, res) => {
   const origin = req.headers.origin;
@@ -30,6 +43,13 @@ const server = http.createServer((req, res) => {
   applyCors(req, res);
 
   if (req.method === "OPTIONS") {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ status: "ok" }));
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/health") {
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ status: "ok" }));

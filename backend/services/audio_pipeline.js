@@ -718,7 +718,8 @@ const buildFeatureSet = async (audioBase64, deps = {}, config) => {
     loadResult = await loadAudioFromBase64(
       audioBase64,
       mergedDeps.mp3Decoder,
-      config?.limits?.maxFileBytes
+      config?.limits?.maxFileBytes,
+      mergedDeps.formatHint
     );
     if (!loadResult.ok) {
       const statusCode = loadResult.error?.code === "DECODER_MISSING" ? 500 : 400;

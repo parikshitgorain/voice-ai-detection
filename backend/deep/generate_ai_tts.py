@@ -82,7 +82,7 @@ def ensure_wav(path, tmp_dir):
     out_path = os.path.join(tmp_dir, f"{base}.wav")
     if os.path.exists(out_path):
         return out_path
-    cmd = f'ffmpeg -y -i "{path}" -ac 1 -ar 24000 "{out_path}"'
+    cmd = f'ffmpeg -y -loglevel error -i "{path}" -ac 1 -ar 24000 "{out_path}"'
     if os.system(cmd) != 0:
         raise RuntimeError(f"ffmpeg failed for {path}")
     return out_path
@@ -116,7 +116,7 @@ def generate_edge_tts(text, voice, out_path):
         mp3_path = out_path.replace(".wav", ".mp3")
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(mp3_path)
-        cmd = f'ffmpeg -y -i "{mp3_path}" -ac 1 -ar 24000 "{out_path}"'
+        cmd = f'ffmpeg -y -loglevel error -i "{mp3_path}" -ac 1 -ar 24000 "{out_path}"'
         if os.system(cmd) != 0:
             raise RuntimeError(f"ffmpeg failed for {mp3_path}")
         try:

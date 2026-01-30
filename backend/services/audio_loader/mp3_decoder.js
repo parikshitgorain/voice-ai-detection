@@ -98,11 +98,17 @@ const probeMp3 = async (filePath) => {
   };
 };
 
-const decodeMp3 = async (buffer) => {
+const decodeMp3 = async (buffer, formatHint = null) => {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "voice-detect-"));
+  const safeHint =
+    typeof formatHint === "string" ? formatHint.trim().toLowerCase() : null;
+  const ext =
+    safeHint && safeHint !== "auto" && /^[a-z0-9]+$/.test(safeHint)
+      ? `.${safeHint}`
+      : ".mp3";
   const tempFile = path.join(
     tempDir,
-    `audio-${crypto.randomBytes(16).toString("hex")}.mp3`
+    `audio-${crypto.randomBytes(16).toString("hex")}${ext}`
   );
 
   try {

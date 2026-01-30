@@ -1,11 +1,31 @@
+const fs = require("fs");
+const path = require("path");
+
+const defaultPythonPath = (() => {
+  const venvPath = path.join(__dirname, "deep", ".venv", "bin", "python");
+  if (fs.existsSync(venvPath)) return venvPath;
+  return "python3";
+})();
+
+const languageModelPaths = {
+  English: process.env.DEEP_MODEL_PATH_ENGLISH,
+  Hindi: process.env.DEEP_MODEL_PATH_HINDI,
+  Tamil: process.env.DEEP_MODEL_PATH_TAMIL,
+  Malayalam: process.env.DEEP_MODEL_PATH_MALAYALAM,
+  Telugu: process.env.DEEP_MODEL_PATH_TELUGU,
+};
+const modelByLanguage = Object.fromEntries(
+  Object.entries(languageModelPaths).filter(([, value]) => value)
+);
 const config = {
-  apiKey: process.env.VOICE_DETECT_API_KEY || "change-me",
+  apiKey: process.env.VOICE_DETECT_API_KEY || "",
   supportedLanguages: ["Tamil", "English", "Hindi", "Malayalam", "Telugu"],
   audioFormat: "mp3",
+  audioFormats: ["mp3"],
   limits: {
     maxFileBytes: 50 * 1024 * 1024,
     maxBodyBytes: 80 * 1024 * 1024,
-    minDurationSeconds: 10,
+    minDurationSeconds: 2,
     maxDurationSeconds: 300,
     longAudioThresholdSeconds: 15,
     windowDurationSeconds: 9,
@@ -71,15 +91,27 @@ const config = {
   deepModel: {
     enabled: true,
     useMultitask: true,
-    pythonPath:
-      process.env.DEEP_MODEL_PYTHON ||
-      "/home/ec2-user/ai-voice-train-data/backend/deep/.venv/bin/python",
+    pythonPath: process.env.DEEP_MODEL_PYTHON || defaultPythonPath,
     scriptPath: process.env.DEEP_MODEL_SCRIPT || null,
     modelPath: process.env.DEEP_MODEL_PATH || null,
-    device: process.env.DEEP_MODEL_DEVICE || "cpu",
+    device: process.env.DEEP_MODEL_DEVICE || "cuda",
     timeoutMs: 30000,
+    classifyThreshold: 0.5,
     fusionWeight: 0.45,
     evidenceThreshold: 0.65,
+    modelByLanguage: Object.keys(modelByLanguage).length ? modelByLanguage : null,
+    languageDetector: {
+      enabled: Boolean(process.env.DEEP_LANG_MODEL_PATH),
+      scriptPath: process.env.DEEP_LANG_MODEL_SCRIPT || null,
+      modelPath: process.env.DEEP_LANG_MODEL_PATH || null,
+      device: process.env.DEEP_LANG_MODEL_DEVICE || null,
+    },
+    languageGate: {
+      enabled: true,
+      mode: "warn", // warn | soft | block
+      minConfidence: 0.7,
+      softPenalty: 0.2,
+    },
   },
 };
 

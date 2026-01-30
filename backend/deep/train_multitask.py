@@ -3,6 +3,7 @@ import json
 import os
 import random
 import time
+import sys
 
 import torch
 import torch.nn as nn
@@ -10,7 +11,7 @@ import torch.nn.functional as F
 import torchaudio
 import soundfile as sf
 import torchvision
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
 
 ALLOWED_EXTS = {".mp3", ".wav", ".flac", ".m4a"}
 
@@ -46,6 +47,21 @@ def infer_multi_label(path):
     if "single" in parts:
         return 0
     return -1
+
+
+def summarize_records(records, languages):
+    counts = {lang: {"human": 0, "ai": 0} for lang in languages}
+    unknown = 0
+    for _, label, lang_id, _ in records:
+        if lang_id is None or lang_id < 0 or lang_id >= len(languages):
+            unknown += 1
+            continue
+        lang = languages[lang_id]
+        if label == 1:
+            counts[lang]["ai"] += 1
+        else:
+            counts[lang]["human"] += 1
+    return counts, unknown
 
 
 class MultiTaskDataset(Dataset):
@@ -164,7 +180,7 @@ class MultiTaskDataset(Dataset):
         )
 
 
-def build_model(arch):
+def build_model(arch, lang_count):
     arch = arch.lower()
     if arch == "resnet18":
         backbone = torchvision.models.resnet18(weights=None)
@@ -184,7 +200,7 @@ def build_model(arch):
                 nn.Linear(256, 128),
             )
             self.ai_head = nn.Linear(feat_dim, 1)
-            self.lang_head = nn.Linear(feat_dim, 5)
+            self.lang_head = nn.Linear(feat_dim, lang_count)
             self.multi_head = nn.Linear(feat_dim, 1)
 
         def forward(self, x):
@@ -196,14 +212,15 @@ def build_model(arch):
 
 
 def nt_xent_loss(z1, z2, temperature=0.2):
-    z1 = F.normalize(z1, dim=1)
-    z2 = F.normalize(z2, dim=1)
+    z1 = F.normalize(z1, dim=1).float()
+    z2 = F.normalize(z2, dim=1).float()
     z = torch.cat([z1, z2], dim=0)
     sim = torch.matmul(z, z.T) / temperature
+    sim = sim.float()
     batch = z1.size(0)
 
-    mask = torch.eye(2 * batch, device=z.device).bool()
-    sim = sim.masked_fill(mask, -9e15)
+    mask = torch.eye(2 * batch, device=z.device, dtype=torch.bool)
+    sim = sim.masked_fill(mask, -1e4)
 
     positives = torch.cat([torch.arange(batch, 2 * batch), torch.arange(0, batch)]).to(z.device)
     loss = F.cross_entropy(sim, positives)
@@ -278,6 +295,10 @@ def evaluate(model, loader, device):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(line_buffering=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default=os.path.join(os.path.dirname(__file__), "..", "data"))
     parser.add_argument("--out", default=os.path.join(os.path.dirname(__file__), "multitask.pt"))
@@ -286,26 +307,65 @@ def main():
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--seed", type=int, default=1337)
     parser.add_argument("--segment", type=float, default=3.0)
-    parser.add_argument("--sr", type=int, default=16000)
+    parser.add_argument("--sr", type=int, default=24000)
     parser.add_argument("--mels", type=int, default=80)
-    parser.add_argument("--nfft", type=int, default=400)
-    parser.add_argument("--hop", type=int, default=160)
+    parser.add_argument("--nfft", type=int, default=512)
+    parser.add_argument("--hop", type=int, default=240)
     parser.add_argument("--workers", type=int, default=2)
     parser.add_argument("--log-interval", type=int, default=200)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--arch", default="resnet18")
     parser.add_argument("--languages", default="", help="Comma-separated language list to include.")
+    parser.add_argument("--balance", action="store_true", help="Enable class-balanced sampling.")
+    parser.add_argument("--resume", default="", help="Path to a checkpoint to resume from.")
+    parser.add_argument(
+        "--min-ai-per-lang",
+        type=int,
+        default=0,
+        help="Fail training if any language has fewer than this many AI samples.",
+    )
+    parser.add_argument(
+        "--min-human-per-lang",
+        type=int,
+        default=0,
+        help="Fail training if any language has fewer than this many human samples.",
+    )
+    parser.add_argument(
+        "--require-language",
+        action="store_true",
+        help="Fail training if any samples lack a language label in the path.",
+    )
     args = parser.parse_args()
 
     seed_all(args.seed)
     device = torch.device(args.device)
 
+    resume_state = None
+    if args.resume:
+        resume_state = torch.load(args.resume, map_location="cpu")
+        args.arch = resume_state.get("arch", args.arch)
+        args.mels = int(resume_state.get("mels", args.mels))
+        args.sr = int(resume_state.get("sr", args.sr))
+        args.segment = float(resume_state.get("segment", args.segment))
+        args.nfft = int(resume_state.get("nfft", args.nfft))
+        args.hop = int(resume_state.get("hop", args.hop))
+
     if args.languages:
         languages = [lang.strip() for lang in args.languages.split(",") if lang.strip()]
         filter_languages = True
+    elif resume_state and resume_state.get("languages"):
+        languages = list(resume_state.get("languages"))
+        filter_languages = False
     else:
         languages = ["Tamil", "English", "Hindi", "Malayalam", "Telugu"]
         filter_languages = False
+
+    if resume_state and resume_state.get("languages"):
+        resume_langs = list(resume_state.get("languages"))
+        if set(resume_langs) != set(languages):
+            raise RuntimeError(
+                f"Resume checkpoint languages {resume_langs} do not match requested {languages}."
+            )
 
     train_ds = MultiTaskDataset(
         args.data,
@@ -333,10 +393,71 @@ def main():
     if len(train_ds) == 0:
         raise RuntimeError("Training data missing or not found.")
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch, shuffle=True, num_workers=args.workers)
-    val_loader = DataLoader(val_ds, batch_size=args.batch, shuffle=False, num_workers=args.workers)
+    train_counts, train_unknown = summarize_records(train_ds.records, languages)
+    val_counts, val_unknown = summarize_records(val_ds.records, languages)
+    print(
+        json.dumps(
+            {
+                "status": "data_counts",
+                "split": "train",
+                "total": len(train_ds),
+                "unknown_language": train_unknown,
+                "counts": train_counts,
+            }
+        )
+    )
+    print(
+        json.dumps(
+            {
+                "status": "data_counts",
+                "split": "val",
+                "total": len(val_ds),
+                "unknown_language": val_unknown,
+                "counts": val_counts,
+            }
+        )
+    )
+    if args.require_language and train_unknown > 0:
+        raise RuntimeError(f"Found {train_unknown} training samples without language labels.")
+    for lang in languages:
+        ai_count = train_counts[lang]["ai"]
+        human_count = train_counts[lang]["human"]
+        if args.min_ai_per_lang and ai_count < args.min_ai_per_lang:
+            raise RuntimeError(f"{lang} AI samples too low: {ai_count} < {args.min_ai_per_lang}")
+        if args.min_human_per_lang and human_count < args.min_human_per_lang:
+            raise RuntimeError(
+                f"{lang} human samples too low: {human_count} < {args.min_human_per_lang}"
+            )
 
-    model = build_model(args.arch).to(device)
+    sampler = None
+    if args.balance:
+        counts = {0: 0, 1: 0}
+        for _, label, _, _ in train_ds.records:
+            counts[label] += 1
+        weights = []
+        for _, label, _, _ in train_ds.records:
+            denom = counts.get(label, 1) or 1
+            weights.append(1.0 / denom)
+        sampler = WeightedRandomSampler(weights, num_samples=len(weights), replacement=True)
+
+    loader_kwargs = {"num_workers": args.workers}
+    if device.type == "cuda":
+        loader_kwargs["pin_memory"] = True
+        if args.workers > 0:
+            loader_kwargs["persistent_workers"] = True
+
+    train_loader = DataLoader(
+        train_ds,
+        batch_size=args.batch,
+        shuffle=sampler is None,
+        sampler=sampler,
+        **loader_kwargs,
+    )
+    val_loader = DataLoader(val_ds, batch_size=args.batch, shuffle=False, **loader_kwargs)
+
+    model = build_model(args.arch, len(languages)).to(device)
+    if resume_state and resume_state.get("model_state"):
+        model.load_state_dict(resume_state["model_state"], strict=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     scaler = torch.cuda.amp.GradScaler(enabled=device.type == "cuda")
 

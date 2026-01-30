@@ -8,10 +8,11 @@ const loadingText = document.getElementById("loading-text");
 const errorEl = document.getElementById("error");
 const languageWarningEl = document.getElementById("language-warning");
 
-const API_KEY = "change-me";
-const API_BASE_URL = "";
+const CONFIG = window.VOICE_AI_CONFIG || {};
+const API_KEY = CONFIG.apiKey || "";
+const API_BASE_URL = CONFIG.apiBaseUrl || "";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
-const MIN_DURATION = 10;
+const MIN_DURATION = 2;
 const MAX_DURATION = 300;
 
 const classificationEl = document.getElementById("classification");
@@ -114,7 +115,9 @@ const validateForm = () => {
   if (!languageSelect.value) return "Select a language.";
   if (!fileInput.files || fileInput.files.length !== 1) return "Attach exactly one MP3 file.";
   const file = fileInput.files[0];
-  if (!file.name.toLowerCase().endsWith(".mp3")) return "File must be an MP3.";
+  const name = file.name.toLowerCase();
+  const allowed = [".mp3"];
+  if (!allowed.some((ext) => name.endsWith(ext))) return "Unsupported audio format.";
   if (file.size > MAX_FILE_BYTES) return "File exceeds 50 MB limit.";
   if (base64Input.value && base64Input.value.length < 20) return "Base64 payload looks incomplete.";
   return null;
@@ -185,15 +188,23 @@ form.addEventListener("submit", async (event) => {
       ? base64Input.value.trim()
       : await readFileAsBase64(file);
 
+    const detectAudioFormat = () => "mp3";
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+    if (API_KEY) {
+      headers["x-api-key"] = API_KEY;
+    } else {
+      errorEl.textContent = "API key is required. Please configure it.";
+      return;
+    }
     const response = await fetch(`${API_BASE_URL}/api/voice-detection`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": API_KEY,
-      },
+      headers,
       body: JSON.stringify({
         language: languageSelect.value,
-        audioFormat: "mp3",
+        audioFormat: detectAudioFormat(file),
         audioBase64,
       }),
     });

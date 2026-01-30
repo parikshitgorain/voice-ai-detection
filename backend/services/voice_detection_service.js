@@ -1,11 +1,24 @@
 const { buildFeatureSet } = require("./audio_pipeline");
-const { classifyFeatures } = require("./classifier");
-const { buildExplanation } = require("./explanation");
 const { computeLanguageWarning } = require("./language_warning");
 const { inferDeepScore } = require("./deep_model");
 
+const buildDeepExplanation = (score) => {
+  if (!Number.isFinite(score)) {
+    return "Deep model output unavailable.";
+  }
+  const pct = (score * 100).toFixed(1);
+  if (score >= 0.5) {
+    return `Deep model estimated an AI probability of ${pct}%.`;
+  }
+  return `Deep model estimated an AI probability of ${pct}%, leaning human.`;
+};
+
 const detectVoiceSource = async (payload, config) => {
-  const featureResult = await buildFeatureSet(payload.audioBase64, {}, config);
+  const featureResult = await buildFeatureSet(
+    payload.audioBase64,
+    { formatHint: payload.audioFormat },
+    config
+  );
   if (!featureResult.ok) {
     return {
       ok: false,
@@ -14,25 +27,51 @@ const detectVoiceSource = async (payload, config) => {
     };
   }
 
-  const deepResult = await inferDeepScore(payload.audioBase64, config);
-  if (deepResult.ok && Number.isFinite(deepResult.score)) {
-    featureResult.data.features.deepScore = deepResult.score;
-  }
-
-  const classificationResult = classifyFeatures(featureResult.data);
-  if (!classificationResult.ok) {
+  const deepResult = await inferDeepScore(
+    payload.audioBase64,
+    config,
+    payload.language,
+    payload.audioFormat
+  );
+  if (!deepResult.ok || !Number.isFinite(deepResult.score)) {
     return {
       ok: false,
-      error: classificationResult.error,
+      error: deepResult.error || { code: "DEEP_MODEL_FAILED", message: "Deep model failed." },
       statusCode: 500,
     };
   }
 
-  const explanationResult = buildExplanation({
-    classification: classificationResult.data.classification,
-    confidenceScore: classificationResult.data.confidenceScore,
-    features: featureResult.data.features,
-  });
+  featureResult.data.features.deepScore = deepResult.score;
+  const threshold =
+    Number.isFinite(config?.deepModel?.classifyThreshold) ? config.deepModel.classifyThreshold : 0.5;
+  const classification = deepResult.score >= threshold ? "AI_GENERATED" : "HUMAN";
+  let confidenceScore = deepResult.score;
+  const explanation = buildDeepExplanation(deepResult.score);
+  const languageGate = config?.deepModel?.languageGate || {};
+  const selectedLanguage = payload.language || null;
+  const mismatchDetected =
+    languageGate.enabled &&
+    selectedLanguage &&
+    deepResult.detectedLanguage &&
+    deepResult.detectedLanguage !== selectedLanguage &&
+    Number.isFinite(deepResult.languageConfidence) &&
+    deepResult.languageConfidence >= (languageGate.minConfidence ?? 0.7);
+
+  if (mismatchDetected && languageGate.mode === "block") {
+    return {
+      ok: false,
+      statusCode: 422,
+      error: {
+        code: "LANGUAGE_MISMATCH",
+        message: `Selected language "${selectedLanguage}" does not match detected "${deepResult.detectedLanguage}".`,
+      },
+    };
+  }
+
+  if (mismatchDetected && languageGate.mode === "soft") {
+    const penalty = Math.max(0, Math.min(1, languageGate.softPenalty ?? 0.2));
+    confidenceScore = Math.max(0, confidenceScore - penalty);
+  }
   const languageWarningResult = computeLanguageWarning(
     featureResult.data.features,
     payload.language,
@@ -43,11 +82,15 @@ const detectVoiceSource = async (payload, config) => {
   return {
     ok: true,
     data: {
-      classification: classificationResult.data.classification,
-      confidenceScore: classificationResult.data.confidenceScore,
-      explanation: explanationResult.explanation,
-      languageWarning: languageWarningResult.languageWarning,
-      languageWarningReason: languageWarningResult.reason || null,
+      classification,
+      confidenceScore,
+      explanation,
+      languageWarning: languageWarningResult.languageWarning || mismatchDetected,
+      languageWarningReason:
+        languageWarningResult.reason ||
+        (mismatchDetected
+          ? `Selected language "${selectedLanguage}" does not match detected "${deepResult.detectedLanguage}".`
+          : null),
       deepScore: deepResult.ok ? deepResult.score : null,
       detectedLanguage: deepResult.ok ? deepResult.detectedLanguage : null,
       languageConfidence: deepResult.ok ? deepResult.languageConfidence : null,

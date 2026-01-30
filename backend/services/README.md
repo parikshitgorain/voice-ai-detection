@@ -7,10 +7,10 @@ This directory structure is final and should remain stable.
 - `audio_types/` Feature schema helpers
 - `audio_pipeline.js` Orchestration of loading + feature extraction
 - `orchestration/` Public orchestration entrypoint(s)
-- `classifier/` Feature-based classification + calibration
+- `classifier/` Legacy feature-based classifier (not used when deep-only mode is enabled)
 - `explanation/` Reserved for future explanation layer
 - `vad/` Speech presence detection gate (WebRTC VAD)
-- `deep_model/` Optional deep-model inference bridge (Python)
+- `deep_model/` Deep-model inference bridge (Python)
 - `language_warning.js` Language mismatch warning (selected vs detected)
 
 Do not move files or merge responsibilities without an explicit design change.

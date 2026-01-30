@@ -29,7 +29,7 @@ const decodeBase64ToBuffer = (audioBase64, maxBytes) => {
   }
 };
 
-const decodeMp3ToPcm = async (mp3Buffer, decoder) => {
+const decodeMp3ToPcm = async (mp3Buffer, decoder, formatHint = null) => {
   if (!decoder) {
     return {
       ok: false,
@@ -38,7 +38,7 @@ const decodeMp3ToPcm = async (mp3Buffer, decoder) => {
   }
 
   try {
-    const decoded = await decoder(mp3Buffer);
+    const decoded = await decoder(mp3Buffer, formatHint);
     if (!decoded || !decoded.pcm || !decoded.sampleRate) {
       return {
         ok: false,
@@ -56,11 +56,11 @@ const computeDurationSeconds = (pcmLength, sampleRate) => {
   return pcmLength / sampleRate;
 };
 
-const loadAudioFromBase64 = async (audioBase64, decoder, maxBytes) => {
+const loadAudioFromBase64 = async (audioBase64, decoder, maxBytes, formatHint = null) => {
   const base64Result = decodeBase64ToBuffer(audioBase64, maxBytes);
   if (!base64Result.ok) return base64Result;
 
-  const decodeResult = await decodeMp3ToPcm(base64Result.buffer, decoder);
+  const decodeResult = await decodeMp3ToPcm(base64Result.buffer, decoder, formatHint);
   if (!decodeResult.ok) return decodeResult;
 
   const duration = computeDurationSeconds(decodeResult.pcm.length, decodeResult.sampleRate);
