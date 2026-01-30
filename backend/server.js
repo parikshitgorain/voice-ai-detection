@@ -3,6 +3,7 @@ const config = require("./config");
 const { handleVoiceDetection } = require("./api/voice_detection");
 
 const PORT = process.env.PORT || 3000;
+const STRICT_ERROR_MESSAGE = "Invalid API key or malformed request";
 
 const buildAllowedOrigins = () => {
   const envValue = process.env.CORS_ORIGINS;
@@ -36,7 +37,7 @@ const applyCors = (req, res) => {
 const sendNotFound = (res) => {
   res.statusCode = 404;
   res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify({ status: "error", message: "Invalid request or unsupported audio." }));
+  res.end(JSON.stringify({ status: "error", message: STRICT_ERROR_MESSAGE }));
 };
 
 const server = http.createServer((req, res) => {
@@ -70,7 +71,7 @@ const server = http.createServer((req, res) => {
       res.statusCode = 413;
       res.setHeader("Content-Type", "application/json");
       res.end(
-        JSON.stringify({ status: "error", message: "Invalid request or unsupported audio." })
+        JSON.stringify({ status: "error", message: STRICT_ERROR_MESSAGE })
       );
       req.destroy();
     }
@@ -85,7 +86,7 @@ const server = http.createServer((req, res) => {
       res.statusCode = 400;
       res.setHeader("Content-Type", "application/json");
       res.end(
-        JSON.stringify({ status: "error", message: "Invalid request or unsupported audio." })
+        JSON.stringify({ status: "error", message: STRICT_ERROR_MESSAGE })
       );
       return;
     }

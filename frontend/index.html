@@ -27,13 +27,18 @@
             </div>
 
             <div class="row">
-              <label for="audio-file">Audio File</label>
-              <input id="audio-file" name="audio-file" type="file" accept=".mp3,audio/mpeg" required />
+              <label for="api-key">API Key</label>
+              <input id="api-key" name="api-key" type="password" autocomplete="off" placeholder="Enter API key" />
+            </div>
+
+            <div class="row">
+              <label for="audio-file">MP3</label>
+              <input id="audio-file" name="audio-file" type="file" accept=".mp3,audio/mpeg" />
             </div>
 
             <details class="details">
               <summary>Base64 input</summary>
-              <textarea id="base64" name="base64" rows="4" placeholder="Paste base64 payload (optional)"></textarea>
+              <textarea id="base64" name="base64" rows="4" placeholder="Paste base64 payload (required if no file)"></textarea>
             </details>
 
             <div class="actions">

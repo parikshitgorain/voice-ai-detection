@@ -1,5 +1,6 @@
 const form = document.getElementById("detect-form");
 const languageSelect = document.getElementById("language");
+const apiKeyInput = document.getElementById("api-key");
 const fileInput = document.getElementById("audio-file");
 const base64Input = document.getElementById("base64");
 const detectBtn = document.getElementById("detect-btn");
@@ -9,7 +10,9 @@ const errorEl = document.getElementById("error");
 const languageWarningEl = document.getElementById("language-warning");
 
 const CONFIG = window.VOICE_AI_CONFIG || {};
-const API_KEY = CONFIG.apiKey || "";
+const DEFAULT_API_KEY = CONFIG.apiKey || "";
+const EFFECTIVE_DEFAULT_KEY = DEFAULT_API_KEY && DEFAULT_API_KEY !== "change-me" ? DEFAULT_API_KEY : "";
+const API_KEY_STORAGE = "voiceAiApiKey";
 const API_BASE_URL = CONFIG.apiBaseUrl || "";
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 const MIN_DURATION = 2;
@@ -20,11 +23,8 @@ const confidenceTextEl = document.getElementById("confidence-text");
 const confidenceBarEl = document.getElementById("confidence-bar");
 const explanationEl = document.getElementById("explanation");
 const rawResponseEl = document.getElementById("raw-response");
-const allowedMessages = [
-  "Audio could not be processed. Please try another file.",
-  "Invalid request or unsupported audio.",
-  "Processing failed. Please retry.",
-];
+const STRICT_ERROR_MESSAGE = "Invalid API key or malformed request";
+const allowedMessages = [STRICT_ERROR_MESSAGE];
 
 const loadingMessages = ["Uploading audio", "Analyzing voice patterns", "Generating decision"];
 let loadingTimers = [];
@@ -32,6 +32,26 @@ let loadingTimers = [];
 const clearLoadingTimers = () => {
   loadingTimers.forEach((timer) => clearTimeout(timer));
   loadingTimers = [];
+};
+
+const loadApiKey = () => {
+  if (!apiKeyInput) return;
+  const saved = localStorage.getItem(API_KEY_STORAGE);
+  if (saved) {
+    apiKeyInput.value = saved;
+  } else if (EFFECTIVE_DEFAULT_KEY) {
+    apiKeyInput.value = EFFECTIVE_DEFAULT_KEY;
+  }
+};
+
+const persistApiKey = () => {
+  if (!apiKeyInput) return;
+  const value = apiKeyInput.value.trim();
+  if (value) {
+    localStorage.setItem(API_KEY_STORAGE, value);
+  } else {
+    localStorage.removeItem(API_KEY_STORAGE);
+  }
 };
 
 const startLoadingCycle = () => {
@@ -100,26 +120,33 @@ const updateOutput = (payload) => {
 
 const mapUserMessage = (message) => {
   if (allowedMessages.includes(message)) return message;
-  if (!message) return "Processing failed. Please retry.";
-  const normalized = message.toLowerCase();
-  if (normalized.includes("decode") || normalized.includes("unsupported format")) {
-    return "Audio could not be processed. Please try another file.";
-  }
-  if (normalized.includes("invalid request") || normalized.includes("unsupported audio")) {
-    return "Invalid request or unsupported audio.";
-  }
-  return "Processing failed. Please retry.";
+  return STRICT_ERROR_MESSAGE;
 };
 
 const validateForm = () => {
   if (!languageSelect.value) return "Select a language.";
-  if (!fileInput.files || fileInput.files.length !== 1) return "Attach exactly one MP3 file.";
-  const file = fileInput.files[0];
-  const name = file.name.toLowerCase();
-  const allowed = [".mp3"];
-  if (!allowed.some((ext) => name.endsWith(ext))) return "Unsupported audio format.";
-  if (file.size > MAX_FILE_BYTES) return "File exceeds 50 MB limit.";
-  if (base64Input.value && base64Input.value.length < 20) return "Base64 payload looks incomplete.";
+  const hasBase64 = base64Input.value.trim().length > 0;
+  const hasFile = fileInput.files && fileInput.files.length === 1;
+  const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
+  if (!apiKey && !EFFECTIVE_DEFAULT_KEY) {
+    return "API key is required. Please enter it.";
+  }
+  if (!hasBase64 && !hasFile) {
+    return "Provide base64 audio or attach one MP3 file.";
+  }
+  if (fileInput.files && fileInput.files.length > 1) {
+    return "Attach exactly one MP3 file.";
+  }
+  if (hasFile) {
+    const file = fileInput.files[0];
+    const name = file.name.toLowerCase();
+    const allowed = [".mp3"];
+    if (!allowed.some((ext) => name.endsWith(ext))) return "Unsupported audio format.";
+    if (file.size > MAX_FILE_BYTES) return "File exceeds 50 MB limit.";
+  }
+  if (hasBase64 && base64Input.value.trim().length < 20) {
+    return "Base64 payload looks incomplete.";
+  }
   return null;
 };
 
@@ -163,6 +190,18 @@ fileInput.addEventListener("change", () => {
   }
 });
 
+base64Input.addEventListener("input", () => {
+  if (base64Input.value.trim().length) {
+    fileInput.value = "";
+  }
+});
+
+if (apiKeyInput) {
+  apiKeyInput.addEventListener("input", () => {
+    persistApiKey();
+  });
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const error = validateForm();
@@ -175,13 +214,15 @@ form.addEventListener("submit", async (event) => {
   resetOutput();
 
   try {
-    const file = fileInput.files[0];
-    const duration = await getAudioDuration(file);
-    if (Number.isFinite(duration) && duration < MIN_DURATION) {
-      throw new Error("Audio duration must be at least 10 seconds.");
-    }
-    if (Number.isFinite(duration) && duration > MAX_DURATION) {
-      throw new Error("Audio duration must be under 5 minutes.");
+    const file = fileInput.files && fileInput.files.length === 1 ? fileInput.files[0] : null;
+    if (file) {
+      const duration = await getAudioDuration(file);
+      if (Number.isFinite(duration) && duration < MIN_DURATION) {
+        throw new Error(`Audio duration must be at least ${MIN_DURATION} seconds.`);
+      }
+      if (Number.isFinite(duration) && duration > MAX_DURATION) {
+        throw new Error("Audio duration must be under 5 minutes.");
+      }
     }
 
     const audioBase64 = base64Input.value.trim()
@@ -193,12 +234,13 @@ form.addEventListener("submit", async (event) => {
     const headers = {
       "Content-Type": "application/json",
     };
-    if (API_KEY) {
-      headers["x-api-key"] = API_KEY;
-    } else {
-      errorEl.textContent = "API key is required. Please configure it.";
+    const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
+    const finalApiKey = apiKey || EFFECTIVE_DEFAULT_KEY;
+    if (!finalApiKey) {
+      errorEl.textContent = "API key is required. Please enter it.";
       return;
     }
+    headers["x-api-key"] = finalApiKey;
     const response = await fetch(`${API_BASE_URL}/api/voice-detection`, {
       method: "POST",
       headers,
@@ -232,7 +274,7 @@ form.addEventListener("submit", async (event) => {
 
     updateOutput(payload);
   } catch (err) {
-    errorEl.textContent = "Processing failed. Please retry.";
+    errorEl.textContent = STRICT_ERROR_MESSAGE;
   } finally {
     clearInputCache();
     setLoading(false);
@@ -240,3 +282,4 @@ form.addEventListener("submit", async (event) => {
 });
 
 resetOutput();
+loadApiKey();

@@ -117,19 +117,17 @@ Audio formats: `mp3` only.
 Success response:
 ```json
 {
+  "status": "success",
+  "language": "English",
   "classification": "AI_GENERATED",
   "confidenceScore": 0.93,
-  "explanation": "Deep model estimated an AI probability of 93%.",
-  "languageWarning": false,
-  "languageWarningReason": null,
-  "detectedLanguage": "English",
-  "languageConfidence": 0.86
+  "explanation": "Deep model estimated an AI probability of 93%."
 }
 ```
 
 Error response:
 ```json
-{ "status": "error", "message": "Audio could not be processed." }
+{ "status": "error", "message": "Invalid API key or malformed request" }
 ```
 
 ## Health Check
