@@ -101,7 +101,7 @@ const config = {
     evidenceThreshold: 0.65,
     modelByLanguage: Object.keys(modelByLanguage).length ? modelByLanguage : null,
     languageDetector: {
-      enabled: Boolean(process.env.DEEP_LANG_MODEL_PATH),
+      enabled: false,
       scriptPath: process.env.DEEP_LANG_MODEL_SCRIPT || null,
       modelPath: process.env.DEEP_LANG_MODEL_PATH || null,
       device: process.env.DEEP_LANG_MODEL_DEVICE || null,

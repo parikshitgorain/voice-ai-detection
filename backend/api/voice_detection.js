@@ -40,6 +40,8 @@ const handleVoiceDetection = async (req, res, payload, config) => {
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(responsePayload));
+  } catch (err) {
+    sendError(res, 500);
   }
 };
 

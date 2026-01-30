@@ -1,5 +1,3 @@
-const { buildFeatureSet } = require("./audio_pipeline");
-const { computeLanguageWarning } = require("./language_warning");
 const { inferDeepScore } = require("./deep_model");
 
 const buildDeepExplanation = (score) => {
@@ -14,19 +12,6 @@ const buildDeepExplanation = (score) => {
 };
 
 const detectVoiceSource = async (payload, config) => {
-  const featureResult = await buildFeatureSet(
-    payload.audioBase64,
-    { formatHint: payload.audioFormat },
-    config
-  );
-  if (!featureResult.ok) {
-    return {
-      ok: false,
-      error: featureResult.error,
-      statusCode: featureResult.statusCode,
-    };
-  }
-
   const deepResult = await inferDeepScore(
     payload.audioBase64,
     config,
@@ -41,7 +26,6 @@ const detectVoiceSource = async (payload, config) => {
     };
   }
 
-  featureResult.data.features.deepScore = deepResult.score;
   const threshold =
     Number.isFinite(config?.deepModel?.classifyThreshold) ? config.deepModel.classifyThreshold : 0.5;
   const classification = deepResult.score >= threshold ? "AI_GENERATED" : "HUMAN";
@@ -72,25 +56,12 @@ const detectVoiceSource = async (payload, config) => {
     const penalty = Math.max(0, Math.min(1, languageGate.softPenalty ?? 0.2));
     confidenceScore = Math.max(0, confidenceScore - penalty);
   }
-  const languageWarningResult = computeLanguageWarning(
-    featureResult.data.features,
-    payload.language,
-    deepResult.ok ? deepResult.detectedLanguage : null,
-    deepResult.ok ? deepResult.languageConfidence : null
-  );
-
   return {
     ok: true,
     data: {
       classification,
       confidenceScore,
       explanation,
-      languageWarning: languageWarningResult.languageWarning || mismatchDetected,
-      languageWarningReason:
-        languageWarningResult.reason ||
-        (mismatchDetected
-          ? `Selected language "${selectedLanguage}" does not match detected "${deepResult.detectedLanguage}".`
-          : null),
       deepScore: deepResult.ok ? deepResult.score : null,
       detectedLanguage: deepResult.ok ? deepResult.detectedLanguage : null,
       languageConfidence: deepResult.ok ? deepResult.languageConfidence : null,
