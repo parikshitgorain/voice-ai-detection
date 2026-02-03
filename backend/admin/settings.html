@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings - Voice AI Detection Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <nav class="admin-nav">
+      <h1>Admin Panel</h1>
+      <ul>
+        <li><a href="/admin/">Dashboard</a></li>
+        <li><a href="/admin/api-keys.html">API Keys</a></li>
+        <li><a href="/admin/settings.html" class="active">Settings</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+    
+    <main class="admin-content">
+      <h2>Settings</h2>
+      
+      <div class="settings-card">
+        <h3>Change Password</h3>
+        <form id="passwordForm">
+          <div class="form-group">
+            <label for="currentPassword">Current Password</label>
+            <input type="password" id="currentPassword" name="currentPassword" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="newPassword">New Password</label>
+            <input type="password" id="newPassword" name="newPassword" required minlength="8">
+            <small>At least 8 characters</small>
+          </div>
+          
+          <div class="form-group">
+            <label for="confirmPassword">Confirm New Password</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" required minlength="8">
+          </div>
+          
+          <div id="passwordError" class="error-message"></div>
+          <div id="passwordSuccess" class="success-message"></div>
+          
+          <button type="submit" class="btn btn-primary">Change Password</button>
+        </form>
+      </div>
+    </main>
+  </div>
+  
+  <script src="/admin/settings.js"></script>
+</body>
+</html>

@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Admin Login - Voice AI Detection</title>
+  <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
-  <div class="login-page">
+  <div class="login-container">
     <div class="login-box">
       <h1>Admin Login</h1>
       <form id="loginForm">
@@ -19,11 +19,11 @@
           <label for="password">Password</label>
           <input type="password" id="password" name="password" required autocomplete="current-password">
         </div>
-        <div id="error" class="error"></div>
-        <button type="submit">Login</button>
+        <div id="error" class="error-message"></div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
       </form>
     </div>
   </div>
-  <script src="login.js"></script>
+  <script src="/admin/login.js"></script>
 </body>
 </html>

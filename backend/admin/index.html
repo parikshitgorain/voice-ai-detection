@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Voice AI Detection Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <nav class="admin-nav">
+      <h1>Admin Panel</h1>
+      <ul>
+        <li><a href="/admin/" class="active">Dashboard</a></li>
+        <li><a href="/admin/api-keys.html">API Keys</a></li>
+        <li><a href="/admin/settings.html">Settings</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+    
+    <main class="admin-content">
+      <h2>Dashboard</h2>
+      
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Total API Keys</h3>
+          <div class="value" id="totalKeys">-</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Active Keys</h3>
+          <div class="value" id="activeKeys">-</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Total Requests (All Time)</h3>
+          <div class="value" id="totalRequests">-</div>
+        </div>
+        
+        <div class="stat-card">
+          <h3>Requests Today</h3>
+          <div class="value" id="todayRequests">-</div>
+        </div>
+      </div>
+      
+      <div class="table-container">
+        <h3 style="padding: 1rem;">Recent Activity</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Key Name</th>
+              <th>Total Requests</th>
+              <th>Today Requests</th>
+              <th>Last Used</th>
+            </tr>
+          </thead>
+          <tbody id="activityTableBody">
+            <tr>
+              <td colspan="4" style="text-align: center;">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+  
+  <script src="/admin/dashboard.js"></script>
+</body>
+</html>

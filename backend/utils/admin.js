@@ -111,8 +111,9 @@ const getApiKeys = () => {
   }));
 };
 
-// Create new API key
-const createApiKey = () => {
+// Create new API key with limits
+// FIX: Added limit fields (type, daily_limit, per_minute_limit, total_limit)
+const createApiKey = (limits = {}) => {
   const rawKey = generateApiKey();
   const keyHash = hashApiKey(rawKey);
   const keyId = "key_" + crypto.randomBytes(8).toString("hex");
@@ -125,21 +126,29 @@ const createApiKey = () => {
     hash: keyHash,
     preview: preview,
     status: "active",
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    limits: {
+      type: limits.type || "unlimited", // "unlimited" or "limited"
+      daily_limit: limits.daily_limit || null,
+      per_minute_limit: limits.per_minute_limit || null,
+      total_limit: limits.total_limit || null
+    }
   });
   
   writeJSON(API_KEYS_FILE, data);
   
-  // Initialize usage tracking
+  // Initialize usage tracking with minute tracking
   const usage = readJSON(USAGE_FILE) || {};
   usage[keyId] = {
     total_requests: 0,
     today_requests: 0,
-    last_used: null
+    minute_requests: 0,
+    last_used: null,
+    last_minute_reset: new Date().toISOString()
   };
   writeJSON(USAGE_FILE, usage);
   
-  // Return raw key only once
+  // Return raw key only once - SECURITY: This is the only time raw key is exposed
   return {
     id: keyId,
     key: rawKey,
@@ -156,6 +165,26 @@ const updateApiKeyStatus = (keyId, status) => {
   if (!key) return false;
   
   key.status = status;
+  return writeJSON(API_KEYS_FILE, data);
+};
+
+// Update API key limits
+// FIX: Allow updating limits for existing API keys
+const updateApiKeyLimits = (keyId, limits) => {
+  const data = readJSON(API_KEYS_FILE);
+  if (!data || !data.keys) return false;
+  
+  const key = data.keys.find(k => k.id === keyId);
+  if (!key) return false;
+  
+  // Update limits
+  key.limits = {
+    type: limits.type || key.limits?.type || "unlimited",
+    daily_limit: limits.daily_limit !== undefined ? limits.daily_limit : (key.limits?.daily_limit || null),
+    per_minute_limit: limits.per_minute_limit !== undefined ? limits.per_minute_limit : (key.limits?.per_minute_limit || null),
+    total_limit: limits.total_limit !== undefined ? limits.total_limit : (key.limits?.total_limit || null)
+  };
+  
   return writeJSON(API_KEYS_FILE, data);
 };
 
@@ -198,31 +227,67 @@ const getDashboardStats = () => {
   };
 };
 
-// Validate and track API key usage
+// Validate and track API key usage with limit enforcement
+// FIX: Added per-minute tracking and limit enforcement
 const validateAndTrackApiKey = (apiKey) => {
-  if (!apiKey) return false;
+  if (!apiKey) return { valid: false, error: "No API key provided" };
   
   const keyHash = hashApiKey(apiKey);
   const data = readJSON(API_KEYS_FILE);
   
-  if (!data || !data.keys) return false;
+  if (!data || !data.keys) return { valid: false, error: "Invalid API key" };
   
   const key = data.keys.find(k => k.hash === keyHash && k.status === "active");
-  if (!key) return false;
+  if (!key) return { valid: false, error: "Invalid or inactive API key" };
   
-  // Update usage
+  // Load usage data
   const usage = readJSON(USAGE_FILE) || {};
   if (!usage[key.id]) {
-    usage[key.id] = { total_requests: 0, today_requests: 0, last_used: null };
+    usage[key.id] = { 
+      total_requests: 0, 
+      today_requests: 0, 
+      minute_requests: 0,
+      last_used: null,
+      last_minute_reset: new Date().toISOString()
+    };
   }
   
+  const now = new Date();
+  const lastMinuteReset = new Date(usage[key.id].last_minute_reset || now);
+  
+  // Reset minute counter if 60 seconds passed
+  if (now - lastMinuteReset >= 60000) {
+    usage[key.id].minute_requests = 0;
+    usage[key.id].last_minute_reset = now.toISOString();
+  }
+  
+  // ENFORCE LIMITS - Only for "limited" type keys
+  if (key.limits && key.limits.type === "limited") {
+    // Check total limit
+    if (key.limits.total_limit !== null && usage[key.id].total_requests >= key.limits.total_limit) {
+      return { valid: false, error: "Total request limit exceeded", code: 429 };
+    }
+    
+    // Check daily limit
+    if (key.limits.daily_limit !== null && usage[key.id].today_requests >= key.limits.daily_limit) {
+      return { valid: false, error: "Daily request limit exceeded", code: 429 };
+    }
+    
+    // Check per-minute limit
+    if (key.limits.per_minute_limit !== null && usage[key.id].minute_requests >= key.limits.per_minute_limit) {
+      return { valid: false, error: "Rate limit exceeded - too many requests per minute", code: 429 };
+    }
+  }
+  
+  // Update usage counters
   usage[key.id].total_requests += 1;
   usage[key.id].today_requests += 1;
-  usage[key.id].last_used = new Date().toISOString();
+  usage[key.id].minute_requests += 1;
+  usage[key.id].last_used = now.toISOString();
   
   writeJSON(USAGE_FILE, usage);
   
-  return true;
+  return { valid: true, keyId: key.id };
 };
 
 // Reset daily counters (call this daily via cron)
@@ -236,6 +301,41 @@ const resetDailyCounters = () => {
   writeJSON(USAGE_FILE, usage);
 };
 
+// Change admin password
+// FIX: Added password change functionality with bcrypt
+const changeAdminPassword = async (currentPassword, newPassword) => {
+  const admin = readJSON(ADMIN_FILE);
+  if (!admin) {
+    return { success: false, error: "Admin data not found" };
+  }
+  
+  // Verify current password
+  try {
+    const isValid = await bcrypt.compare(currentPassword, admin.password_hash);
+    if (!isValid) {
+      return { success: false, error: "Current password is incorrect" };
+    }
+  } catch (err) {
+    return { success: false, error: "Password verification failed" };
+  }
+  
+  // Hash new password
+  try {
+    const newHash = await bcrypt.hash(newPassword, 12);
+    admin.password_hash = newHash;
+    
+    // Write safely
+    const success = writeJSON(ADMIN_FILE, admin);
+    if (!success) {
+      return { success: false, error: "Failed to save new password" };
+    }
+    
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: "Failed to hash new password" };
+  }
+};
+
 module.exports = {
   verifyAdmin,
   createToken,
@@ -244,8 +344,10 @@ module.exports = {
   getApiKeys,
   createApiKey,
   updateApiKeyStatus,
+  updateApiKeyLimits,
   deleteApiKey,
   getDashboardStats,
   validateAndTrackApiKey,
-  resetDailyCounters
+  resetDailyCounters,
+  changeAdminPassword
 };

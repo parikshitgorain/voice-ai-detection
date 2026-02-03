@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const adminModule = require("../utils/admin");
 
-const ADMIN_DIR = path.join(__dirname, "..", "..", "admin");
+const ADMIN_DIR = path.join(__dirname, "..", "admin");
 
 // Serve static admin files
 const serveStaticFile = (req, res, filePath) => {
@@ -38,6 +38,9 @@ const parseBody = (req) => {
   });
 };
 
+// FIX: Added delay on failed login attempts (security)
+let lastFailedLogin = 0;
+
 const handleLogin = async (req, res) => {
   try {
     const { username, password } = await parseBody(req);
@@ -48,6 +51,16 @@ const handleLogin = async (req, res) => {
     }
     const valid = await adminModule.verifyAdmin(username, password);
     if (!valid) {
+      // SECURITY: Add delay on failed login
+      const now = Date.now();
+      const timeSinceLastFailed = now - lastFailedLogin;
+      lastFailedLogin = now;
+      
+      // Wait at least 1 second before responding to failed login
+      if (timeSinceLastFailed < 1000) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
       res.writeHead(401, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Invalid credentials" }));
       return;
@@ -88,9 +101,20 @@ const handleGetKeys = (req, res) => {
   }
 };
 
+// FIX: Updated to accept limits when creating API key
 const handleCreateKey = async (req, res) => {
   try {
-    const result = adminModule.createApiKey();
+    let limits = {};
+    
+    // Try to parse body for limits (optional)
+    try {
+      const body = await parseBody(req);
+      limits = body.limits || {};
+    } catch (err) {
+      // No body or invalid JSON - use defaults (unlimited)
+    }
+    
+    const result = adminModule.createApiKey(limits);
     res.writeHead(201, { "Content-Type": "application/json" });
     res.end(JSON.stringify(result));
   } catch (err) {
@@ -99,20 +123,36 @@ const handleCreateKey = async (req, res) => {
   }
 };
 
+// FIX: Updated to handle both status and limits updates
 const handleUpdateKey = async (req, res, keyId) => {
   try {
-    const { status } = await parseBody(req);
-    if (!status || !["active", "inactive"].includes(status)) {
-      res.writeHead(400, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Invalid status" }));
-      return;
+    const body = await parseBody(req);
+    
+    // Handle status update
+    if (body.status) {
+      if (!["active", "inactive"].includes(body.status)) {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Invalid status" }));
+        return;
+      }
+      const success = adminModule.updateApiKeyStatus(keyId, body.status);
+      if (!success) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Key not found" }));
+        return;
+      }
     }
-    const success = adminModule.updateApiKeyStatus(keyId, status);
-    if (!success) {
-      res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "Key not found" }));
-      return;
+    
+    // Handle limits update
+    if (body.limits) {
+      const success = adminModule.updateApiKeyLimits(keyId, body.limits);
+      if (!success) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Key not found" }));
+        return;
+      }
     }
+    
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true }));
   } catch (err) {
@@ -131,6 +171,45 @@ const handleDeleteKey = (req, res, keyId) => {
     }
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: true }));
+  } catch (err) {
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Internal server error" }));
+  }
+};
+
+// FIX: Handle password change
+const handleChangePassword = async (req, res) => {
+  try {
+    const body = await parseBody(req);
+    const { currentPassword, newPassword, confirmPassword } = body;
+    
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "All fields are required" }));
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "New passwords do not match" }));
+      return;
+    }
+    
+    if (newPassword.length < 8) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Password must be at least 8 characters" }));
+      return;
+    }
+    
+    const result = await adminModule.changeAdminPassword(currentPassword, newPassword);
+    if (!result.success) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: result.error }));
+      return;
+    }
+    
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: true, message: "Password changed successfully" }));
   } catch (err) {
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ error: "Internal server error" }));
@@ -182,6 +261,9 @@ const adminRouter = (req, res) => {
       else if (pathname.match(/^\/admin\/api-keys\/[^/]+$/) && method === "DELETE") {
         const keyId = pathname.split("/").pop();
         handleDeleteKey(req, res, keyId);
+      }
+      else if (pathname === "/admin/change-password" && method === "POST") {
+        handleChangePassword(req, res);
       }
       else {
         res.writeHead(404, { "Content-Type": "application/json" });

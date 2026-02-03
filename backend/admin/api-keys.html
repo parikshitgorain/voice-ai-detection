@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Keys - Voice AI Detection Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div class="admin-container">
+    <nav class="admin-nav">
+      <h1>Admin Panel</h1>
+      <ul>
+        <li><a href="/admin/">Dashboard</a></li>
+        <li><a href="/admin/api-keys.html" class="active">API Keys</a></li>
+        <li><a href="/admin/settings.html">Settings</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+    
+    <main class="admin-content">
+      <div class="page-header">
+        <h2>API Keys</h2>
+        <button class="btn btn-primary" id="createKeyBtn">Create New Key</button>
+      </div>
+      
+      <div class="table-container">
+        <table id="apiKeysTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Daily Limit</th>
+              <th>Per Minute</th>
+              <th>Total Limit</th>
+              <th>Usage</th>
+              <th>Created</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="keysTableBody">
+            <tr>
+              <td colspan="10" style="text-align: center;">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+  
+  <!-- Create Key Modal -->
+  <div id="createKeyModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Create New API Key</h2>
+      <form id="createKeyForm">
+        <div class="form-group">
+          <label for="keyName">Name</label>
+          <input type="text" id="keyName" name="name" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="keyType">Type</label>
+          <select id="keyType" name="type" required>
+            <option value="unlimited">Unlimited</option>
+            <option value="limited">Limited</option>
+          </select>
+        </div>
+        
+        <div id="limitsSection" style="display: none;">
+          <div class="form-group">
+            <label for="dailyLimit">Daily Limit</label>
+            <input type="number" id="dailyLimit" name="daily_limit" min="0" placeholder="0 = unlimited">
+          </div>
+          
+          <div class="form-group">
+            <label for="perMinuteLimit">Per Minute Limit</label>
+            <input type="number" id="perMinuteLimit" name="per_minute_limit" min="0" placeholder="0 = unlimited">
+          </div>
+          
+          <div class="form-group">
+            <label for="totalLimit">Total Limit</label>
+            <input type="number" id="totalLimit" name="total_limit" min="0" placeholder="0 = unlimited">
+          </div>
+        </div>
+        
+        <div id="createError" class="error-message"></div>
+        
+        <button type="submit" class="btn btn-primary">Create Key</button>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Show Key Modal -->
+  <div id="showKeyModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>API Key Created</h2>
+      <div class="warning-message">
+        ⚠️ <strong>Important:</strong> This key will only be shown once. Copy it now!
+      </div>
+      <div class="key-display">
+        <code id="newApiKey"></code>
+        <button class="btn btn-secondary" id="copyKeyBtn">Copy</button>
+      </div>
+      <p>Key Name: <strong id="keyName"></strong></p>
+      <p>Key ID: <strong id="keyId"></strong></p>
+    </div>
+  </div>
+  
+  <!-- Edit Limits Modal -->
+  <div id="editLimitsModal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Edit Limits</h2>
+      <form id="editLimitsForm">
+        <input type="hidden" id="editKeyId">
+        
+        <div class="form-group">
+          <label for="editDailyLimit">Daily Limit</label>
+          <input type="number" id="editDailyLimit" name="daily_limit" min="0" placeholder="0 = unlimited">
+        </div>
+        
+        <div class="form-group">
+          <label for="editPerMinuteLimit">Per Minute Limit</label>
+          <input type="number" id="editPerMinuteLimit" name="per_minute_limit" min="0" placeholder="0 = unlimited">
+        </div>
+        
+        <div class="form-group">
+          <label for="editTotalLimit">Total Limit</label>
+          <input type="number" id="editTotalLimit" name="total_limit" min="0" placeholder="0 = unlimited">
+        </div>
+        
+        <div id="editError" class="error-message"></div>
+        
+        <button type="submit" class="btn btn-primary">Update Limits</button>
+      </form>
+    </div>
+  </div>
+  
+  <script src="/admin/api-keys.js"></script>
+</body>
+</html>
