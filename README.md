@@ -57,6 +57,7 @@ Create `/etc/voice-ai-detection.env`:
 ```
 VOICE_DETECT_API_KEY=your-secret-key
 HOST=127.0.0.1
+CORS_ORIGINS=https://voiceai.parikshit.dev
 DEEP_MODEL_DEVICE=cpu
 DEEP_MODEL_PATH_ENGLISH=/var/www/voice-ai-detection/backend/deep/multitask_English.pt
 DEEP_MODEL_PATH_HINDI=/var/www/voice-ai-detection/backend/deep/multitask_Hindi.pt
@@ -96,7 +97,7 @@ sudo systemctl enable --now voice-ai-detection.service
 Example server block:
 ```nginx
 server {
-    server_name voiceai.example.com;
+    server_name voiceai.parikshit.dev;
 
     root /var/www/voice-ai-detection/frontend;
     index index.html;
@@ -120,8 +121,8 @@ server {
     add_header Expires "0" always;
 
     listen 443 ssl; # managed by Certbot
-    ssl_certificate /etc/letsencrypt/live/voiceai.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/voiceai.example.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/voiceai.parikshit.dev/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/voiceai.parikshit.dev/privkey.pem;
     include /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 }
