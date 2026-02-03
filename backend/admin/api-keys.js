@@ -33,7 +33,7 @@ async function loadApiKeys() {
     }
     
     const data = await response.json();
-    renderApiKeys(data.keys, data.usage);
+    renderApiKeys(data.keys);
   } catch (err) {
     console.error("Error loading API keys:", err);
     keysTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center; color: red;">Failed to load API keys</td></tr>';
@@ -41,14 +41,14 @@ async function loadApiKeys() {
 }
 
 // Render API keys table
-function renderApiKeys(keys, usage) {
+function renderApiKeys(keys) {
   if (!keys || keys.length === 0) {
     keysTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No API keys found</td></tr>';
     return;
   }
   
   keysTableBody.innerHTML = keys.map(key => {
-    const usageData = usage[key.id] || {};
+    const usageData = key.usage || {};
     const dailyLimit = key.daily_limit || 0;
     const perMinuteLimit = key.per_minute_limit || 0;
     const totalLimit = key.total_limit || 0;

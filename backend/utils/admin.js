@@ -104,16 +104,21 @@ const getApiKeys = () => {
   
   return data.keys.map(key => ({
     id: key.id,
-    preview: key.preview,
+    name: key.name || "Unnamed",
+    type: key.type || "unlimited",
     status: key.status,
+    daily_limit: key.daily_limit || 0,
+    per_minute_limit: key.per_minute_limit || 0,
+    total_limit: key.total_limit || 0,
+    preview: key.preview,
     created_at: key.created_at,
     usage: usage[key.id] || { total_requests: 0, today_requests: 0, last_used: null }
   }));
 };
 
 // Create new API key with limits
-// FIX: Added limit fields (type, daily_limit, per_minute_limit, total_limit)
-const createApiKey = (limits = {}) => {
+// FIX: Added name parameter and limit fields (type, daily_limit, per_minute_limit, total_limit)
+const createApiKey = (name = "Unnamed", limits = {}) => {
   const rawKey = generateApiKey();
   const keyHash = hashApiKey(rawKey);
   const keyId = "key_" + crypto.randomBytes(8).toString("hex");
@@ -123,16 +128,15 @@ const createApiKey = (limits = {}) => {
   
   data.keys.push({
     id: keyId,
+    name: name,
     hash: keyHash,
     preview: preview,
     status: "active",
     created_at: new Date().toISOString(),
-    limits: {
-      type: limits.type || "unlimited", // "unlimited" or "limited"
-      daily_limit: limits.daily_limit || null,
-      per_minute_limit: limits.per_minute_limit || null,
-      total_limit: limits.total_limit || null
-    }
+    type: limits.type || "unlimited",
+    daily_limit: limits.daily_limit || 0,
+    per_minute_limit: limits.per_minute_limit || 0,
+    total_limit: limits.total_limit || 0
   });
   
   writeJSON(API_KEYS_FILE, data);
@@ -151,6 +155,7 @@ const createApiKey = (limits = {}) => {
   // Return raw key only once - SECURITY: This is the only time raw key is exposed
   return {
     id: keyId,
+    name: name,
     key: rawKey,
     preview: preview
   };
@@ -177,13 +182,11 @@ const updateApiKeyLimits = (keyId, limits) => {
   const key = data.keys.find(k => k.id === keyId);
   if (!key) return false;
   
-  // Update limits
-  key.limits = {
-    type: limits.type || key.limits?.type || "unlimited",
-    daily_limit: limits.daily_limit !== undefined ? limits.daily_limit : (key.limits?.daily_limit || null),
-    per_minute_limit: limits.per_minute_limit !== undefined ? limits.per_minute_limit : (key.limits?.per_minute_limit || null),
-    total_limit: limits.total_limit !== undefined ? limits.total_limit : (key.limits?.total_limit || null)
-  };
+  // Update limits directly on key (flat structure)
+  key.type = limits.type || key.type || "unlimited";
+  key.daily_limit = limits.daily_limit !== undefined ? limits.daily_limit : (key.daily_limit || 0);
+  key.per_minute_limit = limits.per_minute_limit !== undefined ? limits.per_minute_limit : (key.per_minute_limit || 0);
+  key.total_limit = limits.total_limit !== undefined ? limits.total_limit : (key.total_limit || 0);
   
   return writeJSON(API_KEYS_FILE, data);
 };
@@ -208,22 +211,39 @@ const deleteApiKey = (keyId) => {
 
 // Get dashboard stats
 const getDashboardStats = () => {
-  const keys = readJSON(API_KEYS_FILE) || { keys: [] };
+  const keysData = readJSON(API_KEYS_FILE) || { keys: [] };
   const usage = readJSON(USAGE_FILE) || {};
   
-  let totalCalls = 0;
-  let todayCalls = 0;
+  let totalRequests = 0;
+  let todayRequests = 0;
   
   Object.values(usage).forEach(u => {
-    totalCalls += u.total_requests || 0;
-    todayCalls += u.today_requests || 0;
+    totalRequests += u.total_requests || 0;
+    todayRequests += u.today_requests || 0;
   });
   
+  // Get full keys with usage data
+  const keys = keysData.keys.map(key => ({
+    id: key.id,
+    name: key.name || "Unnamed",
+    type: key.type || "unlimited",
+    status: key.status,
+    daily_limit: key.daily_limit || 0,
+    per_minute_limit: key.per_minute_limit || 0,
+    total_limit: key.total_limit || 0,
+    preview: key.preview,
+    created_at: key.created_at,
+    usage: usage[key.id] || { total_requests: 0, today_requests: 0, last_used: null }
+  }));
+  
   return {
-    total_keys: keys.keys.length,
-    active_keys: keys.keys.filter(k => k.status === "active").length,
-    total_calls: totalCalls,
-    today_calls: todayCalls
+    stats: {
+      total_keys: keysData.keys.length,
+      active_keys: keysData.keys.filter(k => k.status === "active").length,
+      total_requests: totalRequests,
+      today_requests: todayRequests
+    },
+    keys: keys
   };
 };
 
@@ -262,19 +282,19 @@ const validateAndTrackApiKey = (apiKey) => {
   }
   
   // ENFORCE LIMITS - Only for "limited" type keys
-  if (key.limits && key.limits.type === "limited") {
+  if (key.type === "limited") {
     // Check total limit
-    if (key.limits.total_limit !== null && usage[key.id].total_requests >= key.limits.total_limit) {
+    if (key.total_limit && usage[key.id].total_requests >= key.total_limit) {
       return { valid: false, error: "Total request limit exceeded", code: 429 };
     }
     
     // Check daily limit
-    if (key.limits.daily_limit !== null && usage[key.id].today_requests >= key.limits.daily_limit) {
+    if (key.daily_limit && usage[key.id].today_requests >= key.daily_limit) {
       return { valid: false, error: "Daily request limit exceeded", code: 429 };
     }
     
     // Check per-minute limit
-    if (key.limits.per_minute_limit !== null && usage[key.id].minute_requests >= key.limits.per_minute_limit) {
+    if (key.per_minute_limit && usage[key.id].minute_requests >= key.per_minute_limit) {
       return { valid: false, error: "Rate limit exceeded - too many requests per minute", code: 429 };
     }
   }

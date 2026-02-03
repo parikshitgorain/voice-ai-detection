@@ -31,41 +31,39 @@ async function loadStats() {
     document.getElementById("todayRequests").textContent = data.stats.today_requests || 0;
     
     // Render activity table
-    renderActivity(data.keys, data.usage);
+    renderActivity(data.keys);
   } catch (err) {
     console.error("Error loading stats:", err);
   }
 }
 
 // Render activity table
-function renderActivity(keys, usage) {
+function renderActivity(keys) {
   const activityTableBody = document.getElementById("activityTableBody");
   
-  // Combine keys with usage and sort by last_used
-  const keysWithUsage = keys.map(key => ({
-    ...key,
-    usage: usage[key.id] || {}
-  })).sort((a, b) => {
-    const aTime = a.usage.last_used ? new Date(a.usage.last_used).getTime() : 0;
-    const bTime = b.usage.last_used ? new Date(b.usage.last_used).getTime() : 0;
+  // Sort keys by last_used (usage is inside each key object now)
+  const sortedKeys = keys.sort((a, b) => {
+    const aTime = a.usage && a.usage.last_used ? new Date(a.usage.last_used).getTime() : 0;
+    const bTime = b.usage && b.usage.last_used ? new Date(b.usage.last_used).getTime() : 0;
     return bTime - aTime;
   }).slice(0, 10); // Show top 10
   
-  if (keysWithUsage.length === 0) {
+  if (sortedKeys.length === 0) {
     activityTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No activity yet</td></tr>';
     return;
   }
   
-  activityTableBody.innerHTML = keysWithUsage.map(key => {
-    const lastUsed = key.usage.last_used 
-      ? new Date(key.usage.last_used).toLocaleString() 
+  activityTableBody.innerHTML = sortedKeys.map(key => {
+    const usage = key.usage || {};
+    const lastUsed = usage.last_used 
+      ? new Date(usage.last_used).toLocaleString() 
       : "Never";
     
     return `
       <tr>
         <td>${key.name || "Unnamed"}</td>
-        <td>${key.usage.total_requests || 0}</td>
-        <td>${key.usage.today_requests || 0}</td>
+        <td>${usage.total_requests || 0}</td>
+        <td>${usage.today_requests || 0}</td>
         <td>${lastUsed}</td>
       </tr>
     `;

@@ -104,17 +104,19 @@ const handleGetKeys = (req, res) => {
 // FIX: Updated to accept limits when creating API key
 const handleCreateKey = async (req, res) => {
   try {
+    let name = "Unnamed";
     let limits = {};
     
-    // Try to parse body for limits (optional)
+    // Try to parse body for name and limits
     try {
       const body = await parseBody(req);
+      name = body.name || "Unnamed";
       limits = body.limits || {};
     } catch (err) {
       // No body or invalid JSON - use defaults (unlimited)
     }
     
-    const result = adminModule.createApiKey(limits);
+    const result = adminModule.createApiKey(name, limits);
     res.writeHead(201, { "Content-Type": "application/json" });
     res.end(JSON.stringify(result));
   } catch (err) {
@@ -220,6 +222,13 @@ const adminRouter = (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
   const method = req.method;
+  
+  // Serve index.html for /admin/ root path
+  if ((pathname === "/admin" || pathname === "/admin/") && method === "GET") {
+    const filePath = path.join(ADMIN_DIR, "index.html");
+    serveStaticFile(req, res, filePath);
+    return true;
+  }
   
   // Serve static admin files (HTML, JS, CSS)
   if (pathname.startsWith("/admin/") && method === "GET") {
