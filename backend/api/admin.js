@@ -1,6 +1,31 @@
 // Admin API Routes
 const url = require("url");
+const fs = require("fs");
+const path = require("path");
 const adminModule = require("../utils/admin");
+
+const ADMIN_DIR = path.join(__dirname, "..", "..", "admin");
+
+// Serve static admin files
+const serveStaticFile = (req, res, filePath) => {
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      res.end("Not Found");
+      return;
+    }
+    
+    const ext = path.extname(filePath);
+    const contentType = {
+      ".html": "text/html",
+      ".js": "application/javascript",
+      ".css": "text/css"
+    }[ext] || "text/plain";
+    
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(data);
+  });
+};
 
 const parseBody = (req) => {
   return new Promise((resolve, reject) => {
@@ -117,11 +142,25 @@ const adminRouter = (req, res) => {
   const pathname = parsedUrl.pathname;
   const method = req.method;
   
+  // Serve static admin files (HTML, JS, CSS)
+  if (pathname.startsWith("/admin/") && method === "GET") {
+    const staticFiles = [".html", ".js", ".css"];
+    const ext = path.extname(pathname);
+    if (staticFiles.includes(ext)) {
+      const fileName = path.basename(pathname);
+      const filePath = path.join(ADMIN_DIR, fileName);
+      serveStaticFile(req, res, filePath);
+      return true;
+    }
+  }
+  
+  // API: Login (no auth)
   if (pathname === "/admin/login" && method === "POST") {
     handleLogin(req, res);
     return true;
   }
   
+  // API: Protected routes
   if (pathname.startsWith("/admin/")) {
     adminModule.requireAdmin(req, res, () => {
       if (pathname === "/admin/session" && method === "GET") {
