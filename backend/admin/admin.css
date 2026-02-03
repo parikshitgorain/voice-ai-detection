@@ -108,6 +108,29 @@ body {
   width: 100%;
 }
 
+/* Centered header section for human feel */
+.page-header-section {
+  text-align: center;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-header-section h2 {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin: 0;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -116,10 +139,10 @@ body {
 }
 
 h2 {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 500;
   color: var(--text);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
 /* Buttons */
@@ -138,14 +161,14 @@ h2 {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: var(--text);
   color: white;
-  border-color: var(--primary);
+  border-color: var(--text);
 }
 
 .btn-primary:hover {
-  background: #4338ca;
-  border-color: #4338ca;
+  background: #374151;
+  border-color: #374151;
 }
 
 .btn-secondary {
@@ -187,34 +210,36 @@ h2 {
 }
 
 .stat-card {
-  background: var(--card);
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  padding: 16px 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--border);
 }
 
 .stat-card h3 {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
-  font-weight: 500;
-  margin-bottom: 8px;
+  font-weight: 400;
+  margin-bottom: 6px;
+  text-transform: none;
 }
 
 .stat-card .value {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 24px;
+  font-weight: 500;
   color: var(--text);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
-/* Table Container - Card based */
+/* Table Container - Minimal styling */
 .table-container {
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: none;
 }
 
 .table-container h3 {
@@ -394,9 +419,9 @@ td:nth-child(2) {
   background: var(--card);
   padding: 24px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   max-width: 500px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: none;
 }
 
 .settings-card h3 {
@@ -462,11 +487,12 @@ td:nth-child(2) {
   background: var(--card);
   margin: 8% auto;
   padding: 28px;
-  border-radius: 12px;
+  border-radius: 8px;
   width: 90%;
   max-width: 500px;
   position: relative;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border);
 }
 
 .modal-content h2 {
@@ -547,6 +573,21 @@ td:nth-child(2) {
   font-size: 12px;
   word-break: break-all;
   color: var(--text);
+}
+
+/* Developer credit footer - minimal and calm */
+.page-footer {
+  margin-top: 60px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.page-footer p {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 400;
+  margin: 0;
 }
 
 /* Login page */
