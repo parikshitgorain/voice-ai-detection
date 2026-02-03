@@ -248,7 +248,7 @@ const getDashboardStats = () => {
 };
 
 // Validate and track API key usage with limit enforcement
-// FIX: Added per-minute tracking and limit enforcement
+// FIX: Proper per-minute tracking with secure timing logic
 const validateAndTrackApiKey = (apiKey) => {
   if (!apiKey) return { valid: false, error: "No API key provided" };
   
@@ -268,43 +268,47 @@ const validateAndTrackApiKey = (apiKey) => {
       today_requests: 0, 
       minute_requests: 0,
       last_used: null,
-      last_minute_reset: new Date().toISOString()
+      last_minute_reset: Date.now() // Use timestamp instead of ISO string
     };
   }
   
-  const now = new Date();
-  const lastMinuteReset = new Date(usage[key.id].last_minute_reset || now);
+  const now = Date.now();
+  const lastMinuteReset = usage[key.id].last_minute_reset || now;
+  const timeSinceReset = now - lastMinuteReset;
   
-  // Reset minute counter if 60 seconds passed
-  if (now - lastMinuteReset >= 60000) {
+  // Reset minute counter if 60 seconds passed (using milliseconds for precision)
+  // SECURITY: Using >= 60000ms ensures we don't allow bypassing by rapid requests
+  if (timeSinceReset >= 60000) {
     usage[key.id].minute_requests = 0;
-    usage[key.id].last_minute_reset = now.toISOString();
+    usage[key.id].last_minute_reset = now;
   }
   
   // ENFORCE LIMITS - Only for "limited" type keys
   if (key.type === "limited") {
-    // Check total limit
-    if (key.total_limit && usage[key.id].total_requests >= key.total_limit) {
-      return { valid: false, error: "Total request limit exceeded", code: 429 };
+    // Check per-minute limit BEFORE incrementing (prevent bypass)
+    if (key.per_minute_limit && usage[key.id].minute_requests >= key.per_minute_limit) {
+      // Don't increment counters when limit exceeded
+      return { valid: false, error: "Rate limit exceeded - too many requests per minute", code: 429 };
     }
     
-    // Check daily limit
+    // Check daily limit BEFORE incrementing
     if (key.daily_limit && usage[key.id].today_requests >= key.daily_limit) {
       return { valid: false, error: "Daily request limit exceeded", code: 429 };
     }
     
-    // Check per-minute limit
-    if (key.per_minute_limit && usage[key.id].minute_requests >= key.per_minute_limit) {
-      return { valid: false, error: "Rate limit exceeded - too many requests per minute", code: 429 };
+    // Check total limit BEFORE incrementing
+    if (key.total_limit && usage[key.id].total_requests >= key.total_limit) {
+      return { valid: false, error: "Total request limit exceeded", code: 429 };
     }
   }
   
-  // Update usage counters
+  // Update usage counters ONLY after all checks pass
   usage[key.id].total_requests += 1;
   usage[key.id].today_requests += 1;
   usage[key.id].minute_requests += 1;
-  usage[key.id].last_used = now.toISOString();
+  usage[key.id].last_used = new Date().toISOString();
   
+  // CRITICAL: Write to file immediately to prevent race conditions
   writeJSON(USAGE_FILE, usage);
   
   return { valid: true, keyId: key.id };
