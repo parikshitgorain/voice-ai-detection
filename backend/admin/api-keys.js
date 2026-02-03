@@ -44,9 +44,11 @@ async function loadApiKeys() {
 function renderApiKeys(keys) {
   if (!keys || keys.length === 0) {
     keysTableBody.innerHTML = '<tr><td colspan="10" style="text-align: center;">No API keys found</td></tr>';
+    document.getElementById('mobileCards').innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">No API keys found</div>';
     return;
   }
   
+  // Render desktop table
   keysTableBody.innerHTML = keys.map(key => {
     const usageData = key.usage || {};
     const dailyLimit = key.daily_limit || 0;
@@ -75,6 +77,51 @@ function renderApiKeys(keys) {
       </tr>
     `;
   }).join("");
+  
+  // Render mobile cards
+  const mobileCardsContainer = document.getElementById('mobileCards');
+  if (mobileCardsContainer) {
+    mobileCardsContainer.innerHTML = keys.map(key => {
+      const usageData = key.usage || {};
+      const dailyLimit = key.daily_limit || 0;
+      const perMinuteLimit = key.per_minute_limit || 0;
+      const totalLimit = key.total_limit || 0;
+      
+      return `
+        <div class="mobile-card">
+          <div class="mobile-card-header">
+            <div class="mobile-card-title">${key.name || "Unnamed"}</div>
+            <span class="badge badge-${key.status === 'active' ? 'success' : 'warning'}">${key.status}</span>
+          </div>
+          <div class="mobile-card-row">
+            <span class="mobile-card-label">Type</span>
+            <span class="mobile-card-value"><span class="badge badge-${key.type === 'unlimited' ? 'success' : 'info'}">${key.type}</span></span>
+          </div>
+          <div class="mobile-card-row">
+            <span class="mobile-card-label">Daily Limit</span>
+            <span class="mobile-card-value">${key.type === 'limited' ? (dailyLimit || '∞') : '∞'}</span>
+          </div>
+          <div class="mobile-card-row">
+            <span class="mobile-card-label">Per Minute</span>
+            <span class="mobile-card-value">${key.type === 'limited' ? (perMinuteLimit || '∞') : '∞'}</span>
+          </div>
+          <div class="mobile-card-row">
+            <span class="mobile-card-label">Usage Today</span>
+            <span class="mobile-card-value">${usageData.today_requests || 0}</span>
+          </div>
+          <div class="mobile-card-row">
+            <span class="mobile-card-label">Total Usage</span>
+            <span class="mobile-card-value">${usageData.total_requests || 0}</span>
+          </div>
+          <div class="mobile-card-actions">
+            ${key.type === 'limited' ? `<button class="btn btn-sm btn-secondary" onclick="editLimits('${key.id}', ${dailyLimit}, ${perMinuteLimit}, ${totalLimit})">Edit</button>` : ''}
+            <button class="btn btn-sm btn-${key.status === 'active' ? 'warning' : 'success'}" onclick="toggleStatus('${key.id}', '${key.status}')">${key.status === 'active' ? 'Disable' : 'Enable'}</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.id}')">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
 }
 
 // Toggle key type input

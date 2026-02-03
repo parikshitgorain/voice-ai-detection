@@ -7,8 +7,9 @@
   <link rel="stylesheet" href="/admin/admin.css">
 </head>
 <body>
+  <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle menu">☰</button>
   <div class="admin-container">
-    <nav class="admin-nav">
+    <nav class="admin-nav" id="adminNav">
       <h1>Admin Panel</h1>
       <ul>
         <li><a href="/admin/">Dashboard</a></li>
@@ -46,6 +47,7 @@
             </tr>
           </tbody>
         </table>
+        <div class="mobile-cards" id="mobileCards"></div>
       </div>
     </main>
   </div>
@@ -138,6 +140,7 @@
     </div>
   </div>
   
+  <script src="/admin/mobile.js"></script>
   <script src="/admin/api-keys.js"></script>
 </body>
 </html>
