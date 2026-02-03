@@ -5,6 +5,8 @@
   "description": "Backend services for voice AI detection.",
   "main": "server.js",
   "dependencies": {
-    "@ennuicastr/webrtcvad.js": "0.1.1"
+    "@ennuicastr/webrtcvad.js": "0.1.1",
+    "bcrypt": "^6.0.0",
+    "jsonwebtoken": "^9.0.3"
   }
 }

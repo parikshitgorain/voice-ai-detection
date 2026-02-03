@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Voice Detection System</title>
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">AI Voice Detection System</header>
+      <main class="layout">
+        <section class="column">
+          <div class="column-title">INPUT</div>
+          <form id="detect-form" class="form" novalidate>
+            <div class="row">
+              <label for="language">Language</label>
+              <select id="language" name="language" required>
+                <option value="">Select</option>
+                <option value="Tamil">Tamil</option>
+                <option value="English">English</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Malayalam">Malayalam</option>
+                <option value="Telugu">Telugu</option>
+              </select>
+            </div>
+
+            <div class="row">
+              <label for="api-key">API Key</label>
+              <input id="api-key" name="api-key-input" type="password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="Enter API key" />
+            </div>
+
+            <div class="row">
+              <label for="audio-file">MP3</label>
+              <input id="audio-file" name="audio-file" type="file" accept=".mp3,audio/mpeg" />
+            </div>
+
+            <details class="details">
+              <summary>Base64 input</summary>
+              <textarea id="base64" name="base64" rows="4" placeholder="Paste base64 payload (required if no file)"></textarea>
+            </details>
+
+            <div class="actions">
+              <button id="detect-btn" class="primary" type="submit">Detect Voice Source</button>
+              <div id="loading" class="loading" aria-live="polite">
+                <span id="loading-text">Analyzing voice patterns</span>
+                <span class="loading-dot" aria-hidden="true"></span>
+                <span class="loading-dot" aria-hidden="true"></span>
+                <span class="loading-dot" aria-hidden="true"></span>
+                <span class="loading-bar" aria-hidden="true">
+                  <span class="loading-bar-fill"></span>
+                </span>
+              </div>
+            </div>
+            <div class="notice">
+              Audio is processed transiently for analysis and deleted after completion. No audio or voice
+              data is stored.
+            </div>
+            <div id="language-warning" class="warning" role="status">
+              Selected language may not match detected speech.
+            </div>
+            <div id="error" class="error" role="status"></div>
+          </form>
+        </section>
+
+        <section class="column">
+          <div class="column-title">OUTPUT</div>
+          <div class="output">
+            <div class="output-row">
+              <div class="label">Classification</div>
+              <div id="classification" class="value muted">-</div>
+            </div>
+            <div class="output-row">
+              <div class="label">Confidence</div>
+              <div class="value">
+                <span id="confidence-text" class="muted">-</span>
+                <div class="meter">
+                  <div id="confidence-bar" class="meter-fill"></div>
+                </div>
+              </div>
+            </div>
+            <div class="output-row">
+              <div class="label">Explanation</div>
+              <div id="explanation" class="value muted">-</div>
+            </div>
+          </div>
+
+          <details class="details">
+            <summary>View Raw API Response</summary>
+            <pre id="raw-response" class="raw">No response yet.</pre>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <script src="./config.js"></script>
+    <script src="./js/app.js"></script>
+  </body>
+</html>

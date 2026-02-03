@@ -4,95 +4,107 @@
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Voice Detection System</title>
+    <title>AI Voice Detector</title>
     <link rel="stylesheet" href="./css/style.css" />
   </head>
   <body>
-    <div class="page">
-      <header class="header">AI Voice Detection System</header>
-      <main class="layout">
-        <section class="column">
-          <div class="column-title">INPUT</div>
-          <form id="detect-form" class="form" novalidate>
-            <div class="row">
-              <label for="language">Language</label>
-              <select id="language" name="language" required>
-                <option value="">Select</option>
-                <option value="Tamil">Tamil</option>
-                <option value="English">English</option>
-                <option value="Hindi">Hindi</option>
-                <option value="Malayalam">Malayalam</option>
-                <option value="Telugu">Telugu</option>
-              </select>
-            </div>
+    <header class="top-bar">
+      <div class="container">
+        <div class="top-bar-content">
+          <div class="brand">
+            <h1 class="brand-title">AI Voice Detector</h1>
+            <p class="brand-subtitle">Real-time voice authenticity analysis</p>
+          </div>
+        </div>
+      </div>
+    </header>
 
-            <div class="row">
-              <label for="api-key">API Key</label>
-              <input id="api-key" name="api-key-input" type="password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="Enter API key" />
-            </div>
-
-            <div class="row">
-              <label for="audio-file">MP3</label>
-              <input id="audio-file" name="audio-file" type="file" accept=".mp3,audio/mpeg" />
-            </div>
-
-            <details class="details">
-              <summary>Base64 input</summary>
-              <textarea id="base64" name="base64" rows="4" placeholder="Paste base64 payload (required if no file)"></textarea>
-            </details>
-
-            <div class="actions">
-              <button id="detect-btn" class="primary" type="submit">Detect Voice Source</button>
-              <div id="loading" class="loading" aria-live="polite">
-                <span id="loading-text">Analyzing voice patterns</span>
-                <span class="loading-dot" aria-hidden="true"></span>
-                <span class="loading-dot" aria-hidden="true"></span>
-                <span class="loading-dot" aria-hidden="true"></span>
-                <span class="loading-bar" aria-hidden="true">
-                  <span class="loading-bar-fill"></span>
-                </span>
+    <main class="main">
+      <div class="container">
+        <div class="layout">
+          <section class="panel">
+            <h2 class="panel-header">Input</h2>
+            <form id="detect-form" class="form" novalidate>
+              <div class="form-group">
+                <label for="language" class="form-label">Language</label>
+                <select id="language" name="language" class="form-select" required>
+                  <option value="">Select language</option>
+                  <option value="Tamil">Tamil</option>
+                  <option value="English">English</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Malayalam">Malayalam</option>
+                  <option value="Telugu">Telugu</option>
+                </select>
               </div>
-            </div>
-            <div class="notice">
-              Audio is processed transiently for analysis and deleted after completion. No audio or voice
-              data is stored.
-            </div>
-            <div id="language-warning" class="warning" role="status">
-              Selected language may not match detected speech.
-            </div>
-            <div id="error" class="error" role="status"></div>
-          </form>
-        </section>
 
-        <section class="column">
-          <div class="column-title">OUTPUT</div>
-          <div class="output">
-            <div class="output-row">
-              <div class="label">Classification</div>
-              <div id="classification" class="value muted">-</div>
-            </div>
-            <div class="output-row">
-              <div class="label">Confidence</div>
-              <div class="value">
-                <span id="confidence-text" class="muted">-</span>
-                <div class="meter">
-                  <div id="confidence-bar" class="meter-fill"></div>
+              <div class="form-group">
+                <label for="api-key" class="form-label">API Key</label>
+                <input id="api-key" name="api-key-input" type="password" class="form-input" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore="true" placeholder="Enter your API key" />
+              </div>
+
+              <div class="form-group">
+                <label for="audio-file" class="form-label">Audio File</label>
+                <input id="audio-file" name="audio-file" type="file" class="form-file" accept=".mp3,audio/mpeg" />
+              </div>
+
+              <details class="form-advanced">
+                <summary class="form-advanced-toggle">Base64 input</summary>
+                <textarea id="base64" name="base64" class="form-textarea" placeholder="Paste base64 encoded audio (optional)"></textarea>
+              </details>
+
+              <div class="form-actions">
+                <button id="detect-btn" class="btn btn-primary" type="submit">Analyze Audio</button>
+                <div id="loading" class="loading" aria-live="polite">
+                  <span id="loading-text" class="loading-text">Extracting audio features</span>
+                  <span class="loading-indicator">
+                    <span class="loading-bar"></span>
+                  </span>
                 </div>
               </div>
-            </div>
-            <div class="output-row">
-              <div class="label">Explanation</div>
-              <div id="explanation" class="value muted">-</div>
-            </div>
-          </div>
 
-          <details class="details">
-            <summary>View Raw API Response</summary>
-            <pre id="raw-response" class="raw">No response yet.</pre>
-          </details>
-        </section>
-      </main>
-    </div>
+              <div id="error" class="form-error" role="alert"></div>
+              <div id="language-warning" class="form-warning" role="status">
+                Selected language may not match detected speech
+              </div>
+            </form>
+
+            <div class="panel-footer">
+              <p class="footer-text">Audio is processed transiently and deleted after analysis. No data is stored.</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2 class="panel-header">Results</h2>
+            <div class="results">
+              <div class="result-item">
+                <span class="result-label">Classification</span>
+                <span id="classification" class="result-value result-value-placeholder">—</span>
+              </div>
+              
+              <div class="result-item result-item-confidence">
+                <span class="result-label">Confidence</span>
+                <div class="result-confidence">
+                  <span id="confidence-text" class="result-confidence-text">—</span>
+                  <div class="result-confidence-bar">
+                    <div id="confidence-bar" class="result-confidence-fill"></div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="result-item result-item-explanation">
+                <span class="result-label">Analysis</span>
+                <p id="explanation" class="result-explanation">No analysis available</p>
+              </div>
+            </div>
+
+            <details class="panel-details">
+              <summary class="panel-details-toggle">Raw API response</summary>
+              <pre id="raw-response" class="panel-details-content">No response yet</pre>
+            </details>
+          </section>
+        </div>
+      </div>
+    </main>
 
     <script src="./config.js"></script>
     <script src="./js/app.js"></script>

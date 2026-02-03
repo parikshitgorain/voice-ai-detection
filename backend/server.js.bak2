@@ -7,7 +7,6 @@ const { createRateLimiter } = require("./utils/rate_limiter");
 const { isValidApiKey } = require("./utils/authentication");
 const { getClientIp } = require("./utils/client_ip");
 const { logDetection } = require("./utils/logger");
-const { adminRouter } = require("./api/admin");
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -55,7 +54,6 @@ const sendNotFound = (res) => {
 };
 
 const server = http.createServer((req, res) => {
-  if (adminRouter(req, res)) { return; }
   applyCors(req, res);
 
   if (req.method === "OPTIONS") {
