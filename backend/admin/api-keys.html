@@ -21,7 +21,7 @@
     <main class="admin-content">
       <div class="page-header">
         <h2>API Keys</h2>
-        <button class="btn btn-primary" id="createKeyBtn">Create New Key</button>
+        <button class="btn btn-primary" id="createKeyBtn">New key</button>
       </div>
       
       <div class="table-container">
@@ -54,7 +54,7 @@
   <div id="createKeyModal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
-      <h2>Create New API Key</h2>
+      <h2>New API key</h2>
       <form id="createKeyForm">
         <div class="form-group">
           <label for="keyName">Name</label>
@@ -88,7 +88,7 @@
         
         <div id="createError" class="error-message"></div>
         
-        <button type="submit" class="btn btn-primary">Create Key</button>
+        <button type="submit" class="btn btn-primary">Create</button>
       </form>
     </div>
   </div>
@@ -97,16 +97,14 @@
   <div id="showKeyModal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
-      <h2>API Key Created</h2>
-      <div class="warning-message">
-        ⚠️ <strong>Important:</strong> This key will only be shown once. Copy it now!
-      </div>
+      <h2>New API key</h2>
+      <p class="muted-note">Shown once. Copy and store securely.</p>
       <div class="key-display">
         <code id="newApiKey"></code>
-        <button class="btn btn-secondary" id="copyKeyBtn">Copy</button>
+        <button class="btn btn-secondary btn-sm" id="copyKeyBtn">Copy</button>
       </div>
-      <p>Key Name: <strong id="keyName"></strong></p>
-      <p>Key ID: <strong id="keyId"></strong></p>
+      <p style="font-size: 11px; color: #666; margin-top: 8px;">Name: <strong style="color: #1a1a1a;" id="keyName"></strong></p>
+      <p style="font-size: 11px; color: #666;">ID: <strong style="color: #1a1a1a;" id="keyId"></strong></p>
     </div>
   </div>
   
@@ -114,7 +112,7 @@
   <div id="editLimitsModal" class="modal">
     <div class="modal-content">
       <span class="close">&times;</span>
-      <h2>Edit Limits</h2>
+      <h2>Edit limits</h2>
       <form id="editLimitsForm">
         <input type="hidden" id="editKeyId">
         
@@ -135,7 +133,7 @@
         
         <div id="editError" class="error-message"></div>
         
-        <button type="submit" class="btn btn-primary">Update Limits</button>
+        <button type="submit" class="btn btn-primary">Update</button>
       </form>
     </div>
   </div>
