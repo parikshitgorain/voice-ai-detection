@@ -50,7 +50,8 @@ const buildLogBase = (req, payload) => {
 const handleVoiceDetection = async (req, res, payload, config) => {
   const logBase = buildLogBase(req, payload);
 
-  if (!isValidApiKey(req.headers, config)) {
+  const authResult = isValidApiKey(req.headers, config);
+  if (!authResult || !authResult.valid) {
     sendError(res, 404, NOT_FOUND_MESSAGE);
     logDetection({
       ...logBase,
