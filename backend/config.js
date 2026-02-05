@@ -8,11 +8,11 @@ const defaultPythonPath = (() => {
 })();
 
 const languageModelPaths = {
-  English: process.env.DEEP_MODEL_PATH_ENGLISH,
-  Hindi: process.env.DEEP_MODEL_PATH_HINDI,
-  Tamil: process.env.DEEP_MODEL_PATH_TAMIL,
-  Malayalam: process.env.DEEP_MODEL_PATH_MALAYALAM,
-  Telugu: process.env.DEEP_MODEL_PATH_TELUGU,
+  English: process.env.DEEP_MODEL_PATH_ENGLISH || path.join(__dirname, "deep", "multitask_English.pt"),
+  Hindi: process.env.DEEP_MODEL_PATH_HINDI || path.join(__dirname, "deep", "multitask_Hindi.pt"),
+  Tamil: process.env.DEEP_MODEL_PATH_TAMIL || path.join(__dirname, "deep", "multitask_Tamil.pt"),
+  Malayalam: process.env.DEEP_MODEL_PATH_MALAYALAM || path.join(__dirname, "deep", "multitask_Malayalam.pt"),
+  Telugu: process.env.DEEP_MODEL_PATH_TELUGU || path.join(__dirname, "deep", "multitask_Telugu.pt"),
 };
 const modelByLanguage = Object.fromEntries(
   Object.entries(languageModelPaths).filter(([, value]) => value)
