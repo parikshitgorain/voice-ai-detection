@@ -153,24 +153,29 @@ class AudioDataset(Dataset):
 
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--audio", nargs="+", required=True, help="Audio file(s) to train on")
-    parser.add_argument("--label", type=int, default=1, help="Label: 0=human, 1=AI")
+    parser = argparse.ArgumentParser(description="Fine-tune AI voice detection model with balanced dataset")
+    parser.add_argument("--ai-audio", nargs="+", required=True, help="AI-generated audio file(s)")
+    parser.add_argument("--human-audio", nargs="+", required=True, help="Human audio file(s)")
     parser.add_argument("--model", required=True, help="Base model to fine-tune")
     parser.add_argument("--output", default=None, help="Output model path (default: overwrite input)")
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
     parser.add_argument("--noise", type=float, default=0.01, help="Noise augmentation level (0-1)")
     parser.add_argument("--augment", type=int, default=20, help="Augmentation multiplier per sample")
-    parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=0.00001, help="Learning rate (default: very low to preserve existing knowledge)")
     args = parser.parse_args()
     
     output_path = args.output if args.output else args.model
     
-    # Validate audio files
-    for audio_file in args.audio:
+    # Validate AI audio files
+    for audio_file in args.ai_audio:
         if not os.path.exists(audio_file):
-            raise SystemExit(f"Audio file not found: {audio_file}")
+            raise SystemExit(f"AI audio file not found: {audio_file}")
+    
+    # Validate human audio files
+    for audio_file in args.human_audio:
+        if not os.path.exists(audio_file):
+            raise SystemExit(f"Human audio file not found: {audio_file}")
     
     if not os.path.exists(args.model):
         raise SystemExit("Model file missing")
@@ -194,24 +199,32 @@ def main():
     model.to(device)
     model.train()
     
-    # Prepare dataset
+    # Prepare BALANCED dataset with both AI and human samples
     segment_samples = int(segment * sr)
-    labels = [args.label] * len(args.audio)
+    
+    # Combine AI samples (label=1) and human samples (label=0)
+    all_audio_files = list(args.ai_audio) + list(args.human_audio)
+    all_labels = [1] * len(args.ai_audio) + [0] * len(args.human_audio)
     
     dataset = AudioDataset(
-        args.audio, labels, sr, segment_samples, n_mels, nfft, hop,
+        all_audio_files, all_labels, sr, segment_samples, n_mels, nfft, hop,
         noise_level=args.noise, augment_count=args.augment
     )
     
     dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
     
-    print(f"Training with {len(args.audio)} audio files")
+    print(f"\n=== BALANCED TRAINING ===")
+    print(f"AI samples: {len(args.ai_audio)} files (label=1)")
+    print(f"Human samples: {len(args.human_audio)} files (label=0)")
+    print(f"Total audio files: {len(all_audio_files)}")
     print(f"Total samples (with augmentation): {len(dataset)}")
-    print(f"Noise level: {args.noise}")
-    print(f"Augmentation multiplier: {args.augment}")
+    print(f"Noise augmentation: {args.noise}")
+    print(f"Augmentation multiplier: {args.augment}x")
     print(f"Epochs: {args.epochs}")
+    print(f"Learning rate: {args.lr} (low to preserve existing knowledge)")
+    print("=" * 30)
     
-    # Optimizer - only train AI head
+    # Optimizer - only train AI head with very low learning rate
     optimizer = torch.optim.Adam(model.ai_head.parameters(), lr=args.lr)
     criterion = nn.BCEWithLogitsLoss()
     
@@ -220,6 +233,10 @@ def main():
         total_loss = 0
         correct = 0
         total = 0
+        ai_correct = 0
+        ai_total = 0
+        human_correct = 0
+        human_total = 0
         
         for batch_idx, (mel, label) in enumerate(dataloader):
             mel = mel.to(device)
@@ -235,25 +252,38 @@ def main():
             
             total_loss += loss.item()
             
-            # Compute accuracy
+            # Compute accuracy per class
             pred = (torch.sigmoid(ai_logits) > 0.5).float()
             correct += (pred == label).sum().item()
             total += label.size(0)
+            
+            # Track per-class accuracy
+            ai_mask = label == 1
+            human_mask = label == 0
+            if ai_mask.any():
+                ai_correct += (pred[ai_mask] == label[ai_mask]).sum().item()
+                ai_total += ai_mask.sum().item()
+            if human_mask.any():
+                human_correct += (pred[human_mask] == label[human_mask]).sum().item()
+                human_total += human_mask.sum().item()
         
         avg_loss = total_loss / len(dataloader)
         accuracy = 100.0 * correct / total
+        ai_acc = 100.0 * ai_correct / ai_total if ai_total > 0 else 0
+        human_acc = 100.0 * human_correct / human_total if human_total > 0 else 0
         
         if (epoch + 1) % 10 == 0 or epoch == 0:
-            print(f"Epoch {epoch+1}/{args.epochs} - Loss: {avg_loss:.4f}, Accuracy: {accuracy:.2f}%")
+            print(f"Epoch {epoch+1:3d}/{args.epochs} - Loss: {avg_loss:.4f}, "
+                  f"Total: {accuracy:.1f}%, AI: {ai_acc:.1f}%, Human: {human_acc:.1f}%")
     
     # Save fine-tuned model
     print(f"\nSaving fine-tuned model to: {output_path}")
     state["model_state"] = model.state_dict()
     torch.save(state, output_path)
     
-    print("\nFine-tuning complete!")
+    print("\n✅ Fine-tuning complete!")
     print(f"Model saved: {output_path}")
-    print("\nTest your audio samples again to verify improved detection.")
+    print("\nTest your audio samples again to verify balanced detection.")
 
 
 if __name__ == "__main__":

@@ -142,10 +142,27 @@ def main():
     multi_score = sum(multi_probs) / len(multi_probs) if multi_probs else 0.0
     lang_avg = torch.stack(lang_probs).mean(dim=0) if lang_probs else torch.zeros(len(languages))
 
+    # Determine top language
+    top_lang_idx = lang_avg.argmax().item()
+    top_language = languages[top_lang_idx]
+    
+    # Classification based on threshold
+    threshold = 0.5
+    classification = "AI_GENERATED" if ai_score >= threshold else "HUMAN"
+    
+    # Generate explanation
+    ai_percent = ai_score * 100
+    if ai_score >= threshold:
+        explanation = f"Deep model estimated an AI probability of {ai_percent:.1f}%, indicating AI-generated voice."
+    else:
+        explanation = f"Deep model estimated an AI probability of {ai_percent:.1f}%, leaning human."
+    
     output = {
-        "aiScore": ai_score,
-        "multiSpeakerScore": multi_score,
-        "languageDistribution": {languages[i]: float(lang_avg[i]) for i in range(len(languages))},
+        "status": "success",
+        "language": top_language,
+        "classification": classification,
+        "confidenceScore": ai_score,
+        "explanation": explanation,
     }
     print(json.dumps(output))
 
