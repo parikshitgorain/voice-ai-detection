@@ -9,3 +9,6 @@ torch>=2.2.0
 torchaudio>=2.2.0
 torchvision>=0.17.0
 soundfile>=0.12.1
+ffmpeg-python==0.2.0
+librosa==0.11.0
+pydub==0.25.1
