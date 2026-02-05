@@ -257,6 +257,11 @@ form.addEventListener("submit", async (event) => {
       throw new Error("API key is required");
     }
     
+    // Validate API key for safe HTTP header (ASCII only)
+    if (!/^[\x00-\x7F]*$/.test(finalApiKey)) {
+      throw new Error("API key contains invalid characters. Please use only ASCII characters.");
+    }
+    
     // Make API call
     const response = await fetch(`${API_BASE_URL}/api/voice-detection`, {
       method: "POST",
