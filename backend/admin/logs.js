@@ -2,7 +2,7 @@
 let currentLogs = [];
 
 const checkAuth = async () => {
-  const token = localStorage.getItem('admin_token');
+  const token = localStorage.getItem('adminToken');
   if (!token) {
     window.location.href = '/admin/login.html';
     return false;
@@ -13,7 +13,7 @@ const checkAuth = async () => {
       headers: { 'Authorization': `Bearer ${token}` }
     });
     if (!res.ok) {
-      localStorage.removeItem('admin_token');
+      localStorage.removeItem('adminToken');
       window.location.href = '/admin/login.html';
       return false;
     }
@@ -26,7 +26,7 @@ const checkAuth = async () => {
 };
 
 const loadLogs = async () => {
-  const token = localStorage.getItem('admin_token');
+  const token = localStorage.getItem('adminToken');
   const statusFilter = document.getElementById('statusFilter').value;
   const limit = document.getElementById('limitFilter').value;
   const ipFilter = document.getElementById('ipFilter').value.trim();
@@ -157,7 +157,7 @@ const renderLogs = (logs) => {
 // Logout handler
 document.getElementById('logoutBtn').addEventListener('click', (e) => {
   e.preventDefault();
-  localStorage.removeItem('admin_token');
+  localStorage.removeItem('adminToken');
   window.location.href = '/admin/login.html';
 });
 
