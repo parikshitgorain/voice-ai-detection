@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
-import soundfile as sf
 import torchvision
+import librosa
 
 
 def build_model(arch, lang_count):
@@ -42,16 +42,19 @@ def build_model(arch, lang_count):
 
 
 def load_audio(path, sr):
+    """Load audio file using librosa (supports MP3, WAV, etc.)"""
     try:
-        wav, orig_sr = torchaudio.load(path)
-    except Exception:
-        data, orig_sr = sf.read(path, dtype="float32", always_2d=True)
-        wav = torch.from_numpy(data.T)
-    if wav.size(0) > 1:
-        wav = torch.mean(wav, dim=0, keepdim=True)
-    if orig_sr != sr:
-        wav = torchaudio.functional.resample(wav, orig_sr, sr)
-    return wav
+        # librosa loads audio directly at target sample rate
+        wav_np, orig_sr = librosa.load(path, sr=None, mono=True)
+        wav = torch.from_numpy(wav_np).unsqueeze(0)  # Add channel dimension
+        
+        # Resample if needed
+        if orig_sr != sr:
+            wav = torchaudio.functional.resample(wav, orig_sr, sr)
+        
+        return wav
+    except Exception as e:
+        raise RuntimeError(f"Failed to load audio file: {e}")
 
 
 def compute_logmel(wav, sr, n_mels, n_fft, hop_length):
