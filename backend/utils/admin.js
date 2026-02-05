@@ -365,13 +365,25 @@ const getLogs = (limit = 50, statusFilter = '') => {
   try {
     const logFilePath = '/var/log/voice-ai-detection.log';
     
-    // Check if log file exists
+    // Check if log file exists and is readable
     if (!fs.existsSync(logFilePath)) {
+      console.log('Log file does not exist yet');
       return [];
     }
     
-    // Read log file
-    const logData = fs.readFileSync(logFilePath, 'utf8');
+    // Try to read log file with proper error handling
+    let logData;
+    try {
+      logData = fs.readFileSync(logFilePath, 'utf8');
+    } catch (readErr) {
+      console.error('Failed to read log file:', readErr.message);
+      // Return empty array if we can't read the file
+      return [];
+    }
+    
+    if (!logData || !logData.trim()) {
+      return [];
+    }
     
     // Parse JSON lines
     const lines = logData.trim().split('\n').filter(line => line.trim());
@@ -381,8 +393,9 @@ const getLogs = (limit = 50, statusFilter = '') => {
       try {
         const logEntry = JSON.parse(line);
         logs.push(logEntry);
-      } catch (err) {
+      } catch (parseErr) {
         // Skip invalid JSON lines
+        console.warn('Failed to parse log line:', parseErr.message);
         continue;
       }
     }
