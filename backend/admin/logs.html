@@ -83,6 +83,9 @@
     }
     .log-detail {
       font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .log-detail strong {
       color: #666;
@@ -91,6 +94,7 @@
     .log-detail-value {
       color: #333;
       margin-left: 4px;
+      word-break: break-all;
     }
     .log-stats {
       display: grid;
@@ -171,7 +175,7 @@
         </div>
         <div class="log-stat">
           <div class="log-stat-value" id="avgProcessing">-</div>
-          <div class="log-stat-label">Avg Processing (ms)</div>
+          <div class="log-stat-label">Avg Processing</div>
         </div>
       </div>
       

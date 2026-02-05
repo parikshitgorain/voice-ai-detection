@@ -72,18 +72,19 @@ const updateStats = (logs) => {
   const success = logs.filter(log => log.status === 'success').length;
   const errors = logs.filter(log => log.status === 'error').length;
   
+  // Calculate average processing time from successful requests
   const processingTimes = logs
-    .filter(log => log.processingMs !== undefined && log.processingMs !== null)
+    .filter(log => log.status === 'success' && log.processingMs !== undefined && log.processingMs !== null)
     .map(log => log.processingMs);
   
   const avgProcessing = processingTimes.length > 0
     ? Math.round(processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length)
-    : 0;
+    : '-';
   
   document.getElementById('totalLogs').textContent = total;
   document.getElementById('successCount').textContent = success;
   document.getElementById('errorCount').textContent = errors;
-  document.getElementById('avgProcessing').textContent = avgProcessing;
+  document.getElementById('avgProcessing').textContent = avgProcessing === '-' ? avgProcessing : `${avgProcessing}ms`;
 };
 
 const renderLogs = (logs) => {
@@ -109,11 +110,12 @@ const renderLogs = (logs) => {
     let details = [];
     
     if (log.ip) {
-      details.push(`<div class="log-detail"><strong>IP:</strong><span class="log-detail-value">${log.ip}</span></div>`);
+      const shortIp = log.ip.length > 30 ? log.ip.substring(0, 30) + '...' : log.ip;
+      details.push(`<div class="log-detail" title="${log.ip}"><strong>IP:</strong><span class="log-detail-value">${shortIp}</span></div>`);
     }
     
     if (log.requestId) {
-      details.push(`<div class="log-detail"><strong>Request ID:</strong><span class="log-detail-value">${log.requestId.substring(0, 8)}...</span></div>`);
+      details.push(`<div class="log-detail" title="${log.requestId}"><strong>Request ID:</strong><span class="log-detail-value">${log.requestId.substring(0, 8)}...</span></div>`);
     }
     
     if (log.language) {
@@ -125,12 +127,12 @@ const renderLogs = (logs) => {
       details.push(`<div class="log-detail"><strong>Classification:</strong><span class="log-detail-value">${classification}</span></div>`);
     }
     
-    if (log.confidenceScore !== undefined) {
+    if (log.confidenceScore !== undefined && log.confidenceScore !== null) {
       const confidence = (log.confidenceScore * 100).toFixed(2);
       details.push(`<div class="log-detail"><strong>Confidence:</strong><span class="log-detail-value">${confidence}%</span></div>`);
     }
     
-    if (log.processingMs !== undefined) {
+    if (log.processingMs !== undefined && log.processingMs !== null) {
       details.push(`<div class="log-detail"><strong>Processing:</strong><span class="log-detail-value">${log.processingMs}ms</span></div>`);
     }
     
