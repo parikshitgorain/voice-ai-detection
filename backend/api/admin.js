@@ -218,6 +218,21 @@ const handleChangePassword = async (req, res) => {
   }
 };
 
+const handleGetLogs = (req, res, query) => {
+  try {
+    const limit = parseInt(query.limit) || 50;
+    const status = query.status || '';
+    
+    const logs = adminModule.getLogs(limit, status);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ logs }));
+  } catch (err) {
+    console.error('Failed to get logs:', err);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Internal server error" }));
+  }
+};
+
 const adminRouter = (req, res) => {
   const parsedUrl = url.parse(req.url, true);
   const pathname = parsedUrl.pathname;
@@ -273,6 +288,9 @@ const adminRouter = (req, res) => {
       }
       else if (pathname === "/admin/change-password" && method === "POST") {
         handleChangePassword(req, res);
+      }
+      else if (pathname === "/admin/logs" && method === "GET") {
+        handleGetLogs(req, res, parsedUrl.query);
       }
       else {
         res.writeHead(404, { "Content-Type": "application/json" });

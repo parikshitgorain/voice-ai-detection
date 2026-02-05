@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logs - Voice AI Detection Admin</title>
+  <link rel="stylesheet" href="/admin/admin.css">
+  <style>
+    .log-filters {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .log-filters select, .log-filters input {
+      padding: 8px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      background: white;
+    }
+    .log-filters button {
+      padding: 8px 16px;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .log-filters button:hover {
+      opacity: 0.9;
+    }
+    .log-entry {
+      padding: 12px;
+      border: 1px solid #f0f0f0;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      font-size: 13px;
+      background: white;
+      transition: box-shadow 0.2s;
+    }
+    .log-entry:hover {
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .log-timestamp {
+      color: #666;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+    }
+    .log-status {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .log-status.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .log-status.error {
+      background: #ffebee;
+      color: #c62828;
+    }
+    .log-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #f5f5f5;
+    }
+    .log-detail {
+      font-size: 12px;
+    }
+    .log-detail strong {
+      color: #666;
+      font-weight: 500;
+    }
+    .log-detail-value {
+      color: #333;
+      margin-left: 4px;
+    }
+    .log-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .log-stat {
+      padding: 12px;
+      background: white;
+      border: 1px solid #f0f0f0;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .log-stat-value {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .log-stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    .no-logs {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+    @media (max-width: 768px) {
+      .log-filters {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .log-filters select, .log-filters input, .log-filters button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle menu">☰</button>
+  <div class="admin-container">
+    <nav class="admin-nav" id="adminNav">
+      <h1>Admin Panel</h1>
+      <ul>
+        <li><a href="/admin/">Dashboard</a></li>
+        <li><a href="/admin/api-keys.html">API Keys</a></li>
+        <li><a href="/admin/logs.html" class="active">Logs</a></li>
+        <li><a href="/admin/settings.html">Settings</a></li>
+        <li><a href="#" id="logoutBtn">Logout</a></li>
+      </ul>
+    </nav>
+    
+    <main class="admin-content">
+      <div class="page-header-section">
+        <h2>System Logs</h2>
+        <p class="page-subtitle">View API request logs and system activity</p>
+      </div>
+      
+      <div class="log-stats" id="logStats">
+        <div class="log-stat">
+          <div class="log-stat-value" id="totalLogs">-</div>
+          <div class="log-stat-label">Total Entries</div>
+        </div>
+        <div class="log-stat">
+          <div class="log-stat-value" id="successCount">-</div>
+          <div class="log-stat-label">Success</div>
+        </div>
+        <div class="log-stat">
+          <div class="log-stat-value" id="errorCount">-</div>
+          <div class="log-stat-label">Errors</div>
+        </div>
+        <div class="log-stat">
+          <div class="log-stat-value" id="avgProcessing">-</div>
+          <div class="log-stat-label">Avg Processing (ms)</div>
+        </div>
+      </div>
+      
+      <div class="log-filters">
+        <select id="statusFilter">
+          <option value="all">All Status</option>
+          <option value="success">Success</option>
+          <option value="error">Error</option>
+        </select>
+        
+        <select id="limitFilter">
+          <option value="50">Last 50</option>
+          <option value="100">Last 100</option>
+          <option value="200">Last 200</option>
+          <option value="500">Last 500</option>
+        </select>
+        
+        <input type="text" id="ipFilter" placeholder="Filter by IP...">
+        
+        <button onclick="loadLogs()">Refresh</button>
+      </div>
+      
+      <div id="logsContainer">
+        <div class="loading">Loading logs...</div>
+      </div>
+      
+      <footer class="page-footer">
+        <p>Developed by @Arik</p>
+      </footer>
+    </main>
+  </div>
+  
+  <script src="/admin/mobile.js"></script>
+  <script src="/admin/logs.js"></script>
+</body>
+</html>

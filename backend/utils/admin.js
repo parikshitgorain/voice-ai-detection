@@ -360,6 +360,53 @@ const changeAdminPassword = async (currentPassword, newPassword) => {
   }
 };
 
+// Get logs from log file
+const getLogs = (limit = 50, statusFilter = '') => {
+  try {
+    const logFilePath = '/var/log/voice-ai-detection.log';
+    
+    // Check if log file exists
+    if (!fs.existsSync(logFilePath)) {
+      return [];
+    }
+    
+    // Read log file
+    const logData = fs.readFileSync(logFilePath, 'utf8');
+    
+    // Parse JSON lines
+    const lines = logData.trim().split('\n').filter(line => line.trim());
+    const logs = [];
+    
+    for (const line of lines) {
+      try {
+        const logEntry = JSON.parse(line);
+        logs.push(logEntry);
+      } catch (err) {
+        // Skip invalid JSON lines
+        continue;
+      }
+    }
+    
+    // Filter by status if specified
+    let filteredLogs = logs;
+    if (statusFilter && statusFilter !== 'all') {
+      filteredLogs = logs.filter(log => log.status === statusFilter);
+    }
+    
+    // Sort by timestamp (newest first) and limit
+    filteredLogs.sort((a, b) => {
+      const timeA = new Date(a.ts).getTime();
+      const timeB = new Date(b.ts).getTime();
+      return timeB - timeA;
+    });
+    
+    return filteredLogs.slice(0, limit);
+  } catch (err) {
+    console.error('Error reading logs:', err);
+    return [];
+  }
+};
+
 module.exports = {
   verifyAdmin,
   createToken,
@@ -373,5 +420,6 @@ module.exports = {
   getDashboardStats,
   validateAndTrackApiKey,
   resetDailyCounters,
-  changeAdminPassword
+  changeAdminPassword,
+  getLogs
 };
