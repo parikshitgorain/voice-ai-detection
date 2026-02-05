@@ -363,7 +363,7 @@ const changeAdminPassword = async (currentPassword, newPassword) => {
 // Get logs from log file
 const getLogs = (limit = 50, statusFilter = '') => {
   try {
-    const logFilePath = '/var/log/voice-ai-detection.log';
+    const logFilePath = path.join(__dirname, '..', 'logs', 'voice-ai-detection.log');
     
     // Check if log file exists and is readable
     if (!fs.existsSync(logFilePath)) {

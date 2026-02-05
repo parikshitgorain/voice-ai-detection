@@ -18,6 +18,8 @@ exported-cookies.json
 backend/data/
 backend/data_smoke/
 backend/bin/asr_test.wav
+backend/logs/*.log
+backend/logs/*.gz
 data/
 
 # Training artifacts / venv

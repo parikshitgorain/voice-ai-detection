@@ -1,6 +1,7 @@
 const fs = require("fs");
+const path = require("path");
 
-const LOG_PATH = process.env.VOICE_DETECT_LOG_PATH || "/var/log/voice-ai-detection.log";
+const LOG_PATH = process.env.VOICE_DETECT_LOG_PATH || path.join(__dirname, "..", "logs", "voice-ai-detection.log");
 
 const writeLine = (payload) => {
   const line = `${JSON.stringify(payload)}\n`;
