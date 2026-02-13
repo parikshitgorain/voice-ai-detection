@@ -54,7 +54,16 @@ def load_audio(path, sr):
         
         return wav
     except Exception as e:
-        raise RuntimeError(f"Failed to load audio file: {e}")
+        import sys
+        import traceback
+        print(f"ERROR loading audio from: {path}", file=sys.stderr)
+        print(f"File exists: {os.path.exists(path)}", file=sys.stderr)
+        if os.path.exists(path):
+            print(f"File size: {os.path.getsize(path)} bytes", file=sys.stderr)
+        print(f"Exception type: {type(e).__name__}", file=sys.stderr)
+        print(f"Exception message: {str(e)}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        raise RuntimeError(f"Failed to load audio file '{path}': {type(e).__name__}: {str(e)}")
 
 
 def compute_logmel(wav, sr, n_mels, n_fft, hop_length):

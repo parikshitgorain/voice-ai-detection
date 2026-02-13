@@ -216,23 +216,6 @@ const server = http.createServer((req, res) => {
   });
 });
 
-
 server.listen(PORT, HOST, () => {
-  console.log(`✅ Voice detection API listening on ${HOST}:${PORT}`);
-  console.log(`✅ Process ID: ${process.pid}`);
-  console.log(`✅ Node version: ${process.version}`);
-  console.log(`✅ Platform: ${process.platform}`);
-  console.log(`✅ Memory usage: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`);
-  // scheduleDailyReset(); // DISABLED - function not defined
-}).on('error', (err) => {
-  console.error('❌ Failed to start server:', err);
-  if (err.code === 'EADDRINUSE') {
-    console.error(`❌ Port ${PORT} is already in use`);
-  }
-  process.exit(1);
+  console.log(`Voice detection API listening on port ${PORT}`);
 });
-
-setInterval(() => {
-  const mem = process.memoryUsage();
-  console.log(`💓 Health: Memory=${Math.round(mem.heapUsed/1024/1024)}MB, Uptime=${Math.round(process.uptime())}s`);
-}, 300000);

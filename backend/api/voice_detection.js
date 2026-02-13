@@ -4,13 +4,15 @@ const { detectVoiceSource } = require("../services/voice_detection_service");
 const { logDetection } = require("../utils/logger");
 const { getClientIp } = require("../utils/client_ip");
 
-const STRICT_ERROR_MESSAGE = "Invalid API key or malformed request";
-const NOT_FOUND_MESSAGE = "Not Found";
-
-const sendError = (res, statusCode, message = STRICT_ERROR_MESSAGE) => {
-  res.statusCode = statusCode;
-  res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify({ status: "error", message }));
+const sendError = (res, statusCode, message) => {
+  if (res.headersSent || res.destroyed) return;
+  try {
+    res.statusCode = statusCode;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ status: "error", message }));
+  } catch (err) {
+    console.error('Error sending error response:', err.message);
+  }
 };
 
 const buildQueueInfo = (req) => {
@@ -52,7 +54,7 @@ const handleVoiceDetection = async (req, res, payload, config) => {
 
   const authResult = isValidApiKey(req.headers, config);
   if (!authResult || !authResult.valid) {
-    sendError(res, 404, NOT_FOUND_MESSAGE);
+    sendError(res, 401, "Invalid API key.");
     logDetection({
       ...logBase,
       status: "error",
@@ -63,7 +65,7 @@ const handleVoiceDetection = async (req, res, payload, config) => {
 
   const validationError = validateRequest(payload, config);
   if (validationError) {
-    sendError(res, 400);
+    sendError(res, 400, validationError.message || "Malformed request.");
     logDetection({
       ...logBase,
       status: "error",
@@ -75,7 +77,8 @@ const handleVoiceDetection = async (req, res, payload, config) => {
   try {
     const result = await detectVoiceSource(payload, config);
     if (!result.ok) {
-      sendError(res, result.statusCode ?? 400);
+      const errorMessage = result.error?.message || "Voice detection failed.";
+      sendError(res, result.statusCode ?? 400, errorMessage);
       logDetection({
         ...logBase,
         status: "error",
@@ -108,7 +111,7 @@ const handleVoiceDetection = async (req, res, payload, config) => {
       confidenceScore: result.data.confidenceScore,
     });
   } catch (err) {
-    sendError(res, 500);
+    sendError(res, 500, "Internal server error. Please try again.");
     logDetection({
       ...logBase,
       status: "error",

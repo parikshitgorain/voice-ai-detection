@@ -12,19 +12,22 @@ const buildDeepExplanation = (score) => {
 };
 
 const detectVoiceSource = async (payload, config) => {
-  const deepResult = await inferDeepScore(
-    payload.audioBase64,
-    config,
-    payload.language,
-    payload.audioFormat
-  );
-  if (!deepResult.ok || !Number.isFinite(deepResult.score)) {
-    return {
-      ok: false,
-      error: deepResult.error || { code: "DEEP_MODEL_FAILED", message: "Deep model failed." },
-      statusCode: 500,
-    };
-  }
+  try {
+    const deepResult = await inferDeepScore(
+      payload.audioBase64,
+      config,
+      payload.language,
+      payload.audioFormat
+    );
+    
+    if (!deepResult.ok || !Number.isFinite(deepResult.score)) {
+      console.error('Deep model failed:', deepResult.error);
+      return {
+        ok: false,
+        error: deepResult.error || { code: "DEEP_MODEL_FAILED", message: "Deep model failed." },
+        statusCode: 500,
+      };
+    }
 
   const threshold =
     Number.isFinite(config?.deepModel?.classifyThreshold) ? config.deepModel.classifyThreshold : 0.5;
@@ -67,6 +70,14 @@ const detectVoiceSource = async (payload, config) => {
       languageConfidence: deepResult.ok ? deepResult.languageConfidence : null,
     },
   };
+  } catch (err) {
+    console.error('Voice detection service error:', err);
+    return {
+      ok: false,
+      error: { code: "SERVICE_ERROR", message: err.message || "Voice detection failed." },
+      statusCode: 500,
+    };
+  }
 };
 
 module.exports = {
