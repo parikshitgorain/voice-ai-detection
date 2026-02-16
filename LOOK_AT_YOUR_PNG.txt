@@ -1,0 +1,255 @@
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║             👀 WHAT TO LOOK FOR IN YOUR PNG IMAGE 👀                    ║
+║                                                                          ║
+║             I cannot view images, but here's what to find:               ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          🔍 SEARCH FOR THESE WORDS                       │
+└──────────────────────────────────────────────────────────────────────────┘
+
+In your PNG image, look for ANY of these keywords:
+
+FOR GPU (if you want faster processing):
+  ✅ "nvidia"
+  ✅ "GPU"
+  ✅ "CUDA"
+  ✅ "Graphics"
+  ✅ "T4" or "A10" or "A100"
+  ✅ "/dev/nvidia"
+  ✅ "gpu enabled"
+
+FOR SETTINGS:
+  ✅ "Runtime"
+  ✅ "Memory" (choose 4GB+)
+  ✅ "CPU" (choose 2+ cores)
+  ✅ "Restart policy"
+  ✅ "Network mode"
+  ✅ "Ports"
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        📋 COMMON SCREEN TYPES                            │
+└──────────────────────────────────────────────────────────────────────────┘
+
+YOUR IMAGE PROBABLY SHOWS ONE OF THESE:
+
+TYPE 1: Docker Desktop Settings
+┌────────────────────────────────────┐
+│ Settings                           │
+│ ─────────                          │
+│ > General                          │
+│ > Resources  ← YOU'RE HERE         │
+│   > CPUs: [====    ] 4             │
+│   > Memory: [======  ] 8           │
+│ > Docker Engine                    │
+│ > Extensions                       │
+└────────────────────────────────────┘
+👉 SELECT: 4 CPUs, 8GB Memory
+
+TYPE 2: Container Creation Form
+┌────────────────────────────────────┐
+│ Create Container                   │
+│ ─────────────────                  │
+│ Image: [voice-ai-detection:latest] │
+│ Ports: [3000] → [3000]            │
+│ Runtime: [nvidia ▼]  ← IF GPU      │
+│ GPU: [✓] Enable    ← IF GPU        │
+│ Restart: [unless-stopped ▼]       │
+│ Memory: [4GB] CPU: [2]            │
+└────────────────────────────────────┘
+👉 CHECK: GPU (if available), set Memory 4GB+
+
+TYPE 3: Cloud Instance Selection
+┌────────────────────────────────────┐
+│ Choose Instance Type               │
+│ ─────────────────────              │
+│ ○ t2.medium (CPU only)            │
+│ ○ g4dn.xlarge (T4 GPU) ← BEST     │
+│ ○ p3.2xlarge (V100 GPU)           │
+│ ○ p4d.24xlarge (A100 GPU)         │
+└────────────────────────────────────┘
+👉 SELECT: g4dn.xlarge (has T4 GPU, good value)
+
+TYPE 4: Docker Compose/Portainer
+┌────────────────────────────────────┐
+│ Deploy Stack                       │
+│ ─────────────                      │
+│ Name: voice-ai-detection           │
+│ File: [Upload ▼]                   │
+│ Environment: [Browse...]           │
+│ ☐ Enable GPU                       │
+└────────────────────────────────────┘
+👉 UPLOAD: docker-compose.yml, CHECK GPU if available
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                     ✅ WHAT TO SELECT/ENTER                              │
+└──────────────────────────────────────────────────────────────────────────┘
+
+If you see a DROPDOWN or SELECT box:
+
+Runtime:
+  ✅ nvidia      (if you want GPU)
+  ✅ runc        (for CPU only)
+  ❌ kata        (unnecessary)
+
+Restart Policy:
+  ✅ unless-stopped  (recommended)
+  ✅ always          (also good)
+  ❌ no              (bad - won't auto-restart)
+
+Network:
+  ✅ bridge      (default, recommended)
+  ❌ host        (only if you know why)
+  ❌ none        (won't work)
+
+If you see SLIDERS:
+
+Memory:
+  Minimum: 2GB
+  ✅ Recommended: 4GB ← SELECT THIS
+  Better: 8GB
+
+CPUs:
+  Minimum: 1
+  ✅ Recommended: 2 ← SELECT THIS
+  Better: 4
+
+If you see CHECKBOXES:
+
+✅ Check these:
+  [✓] GPU enabled (if you have GPU)
+  [✓] Auto-restart
+  [✓] Health check
+  [✓] Volumes/Persistent storage
+
+❌ Don't check:
+  [ ] Privileged mode
+  [ ] Host network (unless needed)
+
+If you see TEXT FIELDS:
+
+Ports:
+  Host: 3000
+  Container: 3000
+  Protocol: TCP
+
+Image:
+  voice-ai-detection:latest
+
+Environment Variables:
+  Copy from: .env.docker
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                   🎯 DECISION HELPER                                     │
+└──────────────────────────────────────────────────────────────────────────┘
+
+QUESTION 1: Do you see "GPU", "nvidia", or "CUDA" anywhere?
+  ├─ YES → You CAN use GPU
+  │        SELECT: GPU enabled, Runtime: nvidia
+  │        USE: docker-compose.yml
+  │
+  └─ NO  → You have CPU only
+           Don't worry! CPU works fine
+           USE: docker-compose.cpu.yml
+
+QUESTION 2: What's your budget?
+  ├─ Low budget → Use CPU version
+  │               Slower but works
+  │               Cost: ~$0.05/hour
+  │
+  └─ Have budget → Use GPU version
+                   Much faster
+                   Cost: ~$0.35/hour (T4)
+
+QUESTION 3: What's your traffic?
+  ├─ Testing/Low → CPU is fine
+  │                USE: docker-compose.cpu.yml
+  │
+  └─ Production  → GPU recommended
+                   USE: docker-compose.yml
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                🎮 SPECIFIC CLOUD PROVIDERS                               │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Is your PNG from AWS?
+  Look for: Instance type dropdown
+  ✅ Choose: g4dn.xlarge (T4 GPU) or t3.medium (CPU)
+
+Is your PNG from Google Cloud?
+  Look for: Machine type + "Add GPU"
+  ✅ Choose: n1-standard-2 + "1 x NVIDIA Tesla T4"
+
+Is your PNG from Azure?
+  Look for: VM size dropdown
+  ✅ Choose: NC4as T4 v3 (T4 GPU) or B2ms (CPU)
+
+Is your PNG from DigitalOcean?
+  Look for: Droplet type
+  ✅ Choose: GPU Droplet (if available) or CPU Droplet
+
+Is your PNG from Hetzner?
+  Look for: Server type
+  ✅ Choose: GPU instance or CAX11 (CPU)
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│               🆘 STILL CONFUSED? DESCRIBE YOUR IMAGE!                    │
+└──────────────────────────────────────────────────────────────────────────┘
+
+Tell me these 3 things:
+
+1️⃣ What SOFTWARE are you using?
+   Examples: "Docker Desktop", "AWS Console", "Portainer", "Azure Portal"
+
+2️⃣ What do you SEE on screen?
+   Examples: "Dropdown menus", "Sliders", "Checkboxes", "Instance list"
+
+3️⃣ What are 2-3 SPECIFIC options you see?
+   Examples: 
+   - "I see: Runtime (dropdown), GPU (checkbox), Memory (slider)"
+   - "I see: t2.small, t2.medium, g4dn.xlarge in a list"
+   - "I see: CPUs, Memory, Swap settings"
+
+Then I can tell you EXACTLY what to select! 🎯
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                       📚 READ THESE FILES                                │
+└──────────────────────────────────────────────────────────────────────────┘
+
+After understanding what's in your PNG:
+
+1. DOCKER_SETTINGS_REFERENCE.txt  ← Visual tables of all settings
+2. DOCKER_SETUP_SUMMARY.md        ← Complete step-by-step guide
+3. DOCKER_GUIDE.md                ← Detailed documentation
+4. FILE_INDEX.md                  ← List of all files created
+
+┌──────────────────────────────────────────────────────────────────────────┐
+│                    ⚡ QUICK START COMMANDS                               │
+└──────────────────────────────────────────────────────────────────────────┘
+
+After you understand the settings:
+
+WITH GPU:
+  cd /var/www/voice-ai-detection
+  cp .env.docker .env && nano .env
+  docker-compose up -d
+
+WITH CPU ONLY:
+  cd /var/www/voice-ai-detection
+  cp .env.docker .env && nano .env
+  docker-compose -f docker-compose.cpu.yml up -d
+
+CHECK LOGS:
+  docker-compose logs -f
+
+VERIFY:
+  curl http://localhost:3000/health
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                                                                          ║
+║         🎯 Bottom Line: Choose GPU if available & affordable,            ║
+║            otherwise CPU works perfectly fine!                           ║
+║                                                                          ║
+╚══════════════════════════════════════════════════════════════════════════╝

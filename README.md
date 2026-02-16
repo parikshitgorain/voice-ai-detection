@@ -17,24 +17,32 @@ Production-grade system to classify uploaded audio as **HUMAN** or **AI_GENERATE
 - `backend/`: Node.js API + deep model integration
 - `backend/deep/`: Python inference code + model weights
 
-## Requirements (CPU VPS)
+## Requirements
 - Node.js 18+
 - Python 3.9+ (tested with 3.12)
 - ffmpeg + ffprobe available on PATH
 - Git LFS (for model weights)
+
+**GPU Support (Optional):**
+- NVIDIA GPU (T4, A10, A100, or any CUDA-compatible)
+- System auto-detects GPU and falls back to CPU if unavailable
+- See [GPU_CONFIGURATION.md](GPU_CONFIGURATION.md) for GPU setup
 
 ## Quick Start (Local)
 ```bash
 cd backend
 npm install
 
-# Python venv for deep model (CPU)
-python3 -m venv deep/.venv
-./deep/.venv/bin/pip install -r deep/requirements.txt
-# If torch/torchaudio need CPU wheels explicitly:
-# ./deep/.venv/bin/pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+# Automated GPU/CPU setup (recommended)
+cd ..
+./scripts/setup_gpu.sh
+
+# OR manual setup:
+# python3 -m venv backend/deep/.venv
+# backend/deep/.venv/bin/pip install -r backend/deep/requirements.txt
 
 # Run API
+cd backend
 node server.js
 ```
 
@@ -49,6 +57,38 @@ Frontend runtime config:
 - `frontend/config.js` is loaded at runtime.
 - Set `apiBaseUrl` if backend is on another origin.
 - API key is NOT stored or prefilled in the UI.
+
+## Docker Deployment (Recommended)
+
+### GPU-Enabled (Faster)
+```bash
+# Install NVIDIA Container Toolkit (if you have GPU)
+sudo apt-get install -y nvidia-container-toolkit
+sudo systemctl restart docker
+
+# Build and run
+cd /var/www/voice-ai-detection
+cp .env.docker .env
+nano .env  # Set your API key!
+docker-compose up -d
+
+# Verify
+docker-compose logs -f
+docker exec voice-ai-detection python3 /app/backend/deep/detect_device.py
+```
+
+### CPU-Only (Budget VPS)
+```bash
+cd /var/www/voice-ai-detection
+cp .env.docker .env
+nano .env  # Set your API key!
+docker-compose -f docker-compose.cpu.yml up -d
+
+# Verify
+docker-compose logs -f
+```
+
+See [DOCKER_GUIDE.md](DOCKER_GUIDE.md) and [DOCKER_SETTINGS_REFERENCE.txt](DOCKER_SETTINGS_REFERENCE.txt) for detailed instructions.
 
 ## Production Deploy (Nginx + systemd)
 

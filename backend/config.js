@@ -1,11 +1,16 @@
 const fs = require("fs");
 const path = require("path");
+const { getDevice } = require("./utils/gpu_helper");
 
 const defaultPythonPath = (() => {
   const venvPath = path.join(__dirname, "deep", ".venv", "bin", "python");
   if (fs.existsSync(venvPath)) return venvPath;
   return "python3";
 })();
+
+// Auto-detect GPU or fallback to CPU
+// Can be overridden with DEEP_MODEL_DEVICE=cpu|cuda|auto
+const defaultDevice = getDevice(defaultPythonPath);
 
 const languageModelPaths = {
   English: process.env.DEEP_MODEL_PATH_ENGLISH || path.join(__dirname, "deep", "multitask_English.pt"),
@@ -98,7 +103,7 @@ const config = {
     pythonPath: process.env.DEEP_MODEL_PYTHON || defaultPythonPath,
     scriptPath: process.env.DEEP_MODEL_SCRIPT || null,
     modelPath: process.env.DEEP_MODEL_PATH || null,
-    device: process.env.DEEP_MODEL_DEVICE || "cpu",
+    device: process.env.DEEP_MODEL_DEVICE || defaultDevice,
     timeoutMs: 30000,
     classifyThreshold: 0.5,
     fusionWeight: 0.45,
