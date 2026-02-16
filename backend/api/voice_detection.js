@@ -4,6 +4,10 @@ const { detectVoiceSource } = require("../services/voice_detection_service");
 const { logDetection } = require("../utils/logger");
 const { getClientIp } = require("../utils/client_ip");
 
+/**
+ * Send error response in standardized format
+ * Complies with hackathon evaluation requirements
+ */
 const sendError = (res, statusCode, message) => {
   if (res.headersSent || res.destroyed) return;
   try {
@@ -15,19 +19,9 @@ const sendError = (res, statusCode, message) => {
   }
 };
 
-const buildQueueInfo = (req) => {
-  const meta = req.queueMeta || {};
-  if (!meta.queued) return null;
-  const waitMs =
-    Number.isFinite(meta.startedAt) && Number.isFinite(meta.queuedAt)
-      ? Math.max(0, meta.startedAt - meta.queuedAt)
-      : null;
-  return {
-    position: meta.position,
-    waitMs,
-  };
-};
-
+/**
+ * Build log metadata from request
+ */
 const buildLogBase = (req, payload) => {
   const meta = req.queueMeta || {};
   const queueWaitMs =
@@ -49,11 +43,15 @@ const buildLogBase = (req, payload) => {
   };
 };
 
+/**
+ * Handle voice detection API request
+ * Returns exactly 3 fields for hackathon compliance: status, classification, confidenceScore
+ */
 const handleVoiceDetection = async (req, res, payload, config) => {
   const logBase = buildLogBase(req, payload);
 
+  // Validate API key
   const authResult = isValidApiKey(req.headers, config);
-  // Handle both boolean and object return types
   const isValid = typeof authResult === 'boolean' ? authResult : (authResult && authResult.valid);
   
   if (!isValid) {
@@ -66,6 +64,7 @@ const handleVoiceDetection = async (req, res, payload, config) => {
     return;
   }
 
+  // Validate request payload
   const validationError = validateRequest(payload, config);
   if (validationError) {
     sendError(res, 400, validationError.message || "Malformed request.");
@@ -78,6 +77,7 @@ const handleVoiceDetection = async (req, res, payload, config) => {
   }
 
   try {
+    // Perform voice detection
     const result = await detectVoiceSource(payload, config);
     if (!result.ok) {
       const errorMessage = result.error?.message || "Voice detection failed.";
@@ -90,18 +90,12 @@ const handleVoiceDetection = async (req, res, payload, config) => {
       return;
     }
 
+    // Format response with exactly 3 fields (hackathon compliance)
     const responsePayload = {
       status: "success",
-      language: payload.language,
       classification: result.data.classification,
       confidenceScore: result.data.confidenceScore,
-      explanation: result.data.explanation,
     };
-
-    const queueInfo = buildQueueInfo(req);
-    if (queueInfo) {
-      responsePayload.queue = queueInfo;
-    }
 
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json");

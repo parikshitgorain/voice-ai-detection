@@ -167,13 +167,16 @@ curl http://localhost:3000/health
 ## API
 
 ### POST /api/voice-detection
+
+**Hackathon Compliance:** This endpoint returns responses in the exact format required by the evaluation specification.
+
 Headers:
 ```
 Content-Type: application/json
 x-api-key: <key>
 ```
 
-Body:
+Request Body:
 ```json
 {
   "language": "English",
@@ -182,24 +185,66 @@ Body:
 }
 ```
 
-Success response:
+**Supported Languages (case-sensitive):**
+- `"English"`
+- `"Hindi"`
+- `"Tamil"`
+- `"Malayalam"`
+- `"Telugu"`
+
+**Audio Format (case-sensitive):**
+- `"mp3"` (only)
+
+**Success Response (HTTP 200):**
 ```json
 {
   "status": "success",
-  "language": "English",
-  "classification": "AI_GENERATED",
-  "confidenceScore": 0.93,
-  "explanation": "Deep model estimated an AI probability of 93%."
+  "classification": "HUMAN",
+  "confidenceScore": 0.85
 }
 ```
 
-Error responses:
-- `404` for unauthorized or unknown routes (intentionally hides API)
-- `400` for malformed requests
-- `413` if body exceeds limits
-- `429` when rate limit is exceeded
-- `503` when the queue is full
-- `500` for internal failures
+**Response Fields:**
+- `status`: Always `"success"` for successful requests
+- `classification`: Either `"HUMAN"` or `"AI_GENERATED"` (case-sensitive)
+- `confidenceScore`: Float between 0.0 and 1.0 indicating prediction confidence
+
+**Error Response:**
+```json
+{
+  "status": "error",
+  "message": "Error description"
+}
+```
+
+**Error Status Codes:**
+- `401` - Invalid or missing API key
+- `400` - Malformed request or validation error
+- `413` - File size exceeds 50 MB limit
+- `429` - Rate limit exceeded
+- `503` - Queue is full
+- `500` - Internal server error
+
+**Example Request:**
+```bash
+curl -X POST http://localhost:3000/api/voice-detection \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: your-api-key" \
+  -d '{
+    "language": "English",
+    "audioFormat": "mp3",
+    "audioBase64": "base64_encoded_audio_data"
+  }'
+```
+
+**Example Success Response:**
+```json
+{
+  "status": "success",
+  "classification": "AI_GENERATED",
+  "confidenceScore": 0.93
+}
+```
 
 ### GET /api/queue
 - Requires `x-api-key`

@@ -32,7 +32,10 @@ const detectVoiceSource = async (payload, config) => {
   const threshold =
     Number.isFinite(config?.deepModel?.classifyThreshold) ? config.deepModel.classifyThreshold : 0.5;
   const classification = deepResult.score >= threshold ? "AI_GENERATED" : "HUMAN";
-  let confidenceScore = deepResult.score;
+  // Confidence should reflect certainty in the classification
+  // For AI: use aiScore directly
+  // For HUMAN: use 1 - aiScore (how confident it's NOT AI)
+  let confidenceScore = classification === "AI_GENERATED" ? deepResult.score : (1 - deepResult.score);
   const explanation = buildDeepExplanation(deepResult.score);
   const languageGate = config?.deepModel?.languageGate || {};
   const selectedLanguage = payload.language || null;
