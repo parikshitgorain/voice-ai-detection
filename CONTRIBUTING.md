@@ -30,4 +30,15 @@ python3 -m http.server 5173 --directory frontend
 ## Pull Requests
 - Describe what changed and why.
 - Add tests or smoke checks when applicable.
-*** End Patch}*** End Patch**"}"}print((json.dumps({}))) is redundant. Stop. I must use apply_patch properly without JSON. I used tool wrongly. Let's redo. We'll add file correctly. Ensure no stray. Use apply_patch tool with proper content. Let's do now.}
+- Follow existing code style.
+- Keep commits focused and well-documented.
+
+## Testing
+Run smoke tests:
+```bash
+./scripts/smoke_test.sh
+```
+
+## Questions?
+Open an issue or contact the maintainer.
+

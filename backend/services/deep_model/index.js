@@ -3,6 +3,7 @@ const fs = require("fs/promises");
 const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
+const { getServer, startServer } = require("./persistent_server");
 
 const runPython = (pythonPath, scriptPath, args, timeoutMs = 30000) =>
   new Promise((resolve, reject) => {
@@ -77,6 +78,10 @@ const runPython = (pythonPath, scriptPath, args, timeoutMs = 30000) =>
     });
   });
 
+// Initialize persistent server on first use
+let serverInitialized = false;
+let usePersistentServer = process.env.USE_PERSISTENT_SERVER !== 'false'; // Default true
+
 const inferDeepScore = async (audioBase64, config, selectedLanguage = null, audioFormat = null) => {
   let tempDir = null;
   let tempFile = null;
@@ -92,6 +97,20 @@ const inferDeepScore = async (audioBase64, config, selectedLanguage = null, audi
         languageDistribution: null,
         multiSpeakerScore: null,
       };
+    }
+    
+    // Initialize persistent server on first request
+    if (usePersistentServer && !serverInitialized) {
+      try {
+        const pythonPath = settings.pythonPath || "python3";
+        const device = settings.device || "cpu";
+        await startServer({ pythonPath, device });
+        serverInitialized = true;
+        console.log('[DeepModel] Persistent server initialized');
+      } catch (err) {
+        console.error('[DeepModel] Failed to start persistent server, falling back to spawn mode:', err.message);
+        usePersistentServer = false;
+      }
     }
 
     // Validate inputs
@@ -167,6 +186,46 @@ const inferDeepScore = async (audioBase64, config, selectedLanguage = null, audi
 
     await fs.writeFile(tempFile, buffer);
 
+    // Try persistent server first for faster inference
+    if (usePersistentServer && serverInitialized) {
+      try {
+        const server = getServer();
+        if (server.isReady()) {
+          const result = await server.infer(tempFile, modelPath, timeoutMs);
+          
+          if (result.error) {
+            throw new Error(result.error);
+          }
+          
+          // Extract language info from result
+          let detectedLanguage = null;
+          let languageConfidence = null;
+          let languageDistribution = result.languageDistribution || null;
+          
+          if (languageDistribution) {
+            const entries = Object.entries(languageDistribution).filter(([, v]) => Number.isFinite(v));
+            if (entries.length) {
+              entries.sort((a, b) => b[1] - a[1]);
+              [detectedLanguage, languageConfidence] = entries[0];
+            }
+          }
+          
+          return {
+            ok: true,
+            score: result.aiScore,
+            detectedLanguage,
+            languageConfidence,
+            languageDistribution,
+            multiSpeakerScore: result.multiSpeakerScore || null,
+          };
+        }
+      } catch (serverErr) {
+        console.error('[DeepModel] Persistent server failed, falling back to spawn:', serverErr.message);
+        // Fall through to spawn mode
+      }
+    }
+
+    // Fallback to spawn mode (original implementation)
     let detectedLanguage = null;
     let languageConfidence = null;
     let languageDistribution = null;

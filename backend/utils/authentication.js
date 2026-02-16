@@ -1,31 +1,36 @@
-// FIX: Updated to handle new validation response with limit enforcement
+// Authentication with admin-managed API keys (sk_*) and legacy config key
 const isValidApiKey = (headers, config) => {
-  // First check new admin-managed API keys with limit enforcement
   const apiKey = headers["x-api-key"];
-  if (apiKey) {
+  
+  if (!apiKey) {
+    return false;
+  }
+  
+  // Check admin-managed API keys (sk_*) with limit enforcement
+  if (apiKey.startsWith("sk_")) {
     try {
       const adminModule = require("./admin");
       if (adminModule && adminModule.validateAndTrackApiKey) {
         const result = adminModule.validateAndTrackApiKey(apiKey);
         
-        // Return result object for proper error handling
-        // { valid: true/false, error: string, code: number }
+        // Result: { valid: true/false, error: string, code: number }
         if (result && typeof result === 'object') {
-          return result;
+          return result.valid === true;
         }
       }
     } catch (err) {
-      // Admin module not available or error, continue to legacy check
+      // Admin module error - reject admin keys if module fails
       console.error("Admin module error:", err.message);
+      return false;
     }
   }
   
-  // Fallback to legacy config-based API key (unlimited)
+  // Fallback to legacy config-based API key (unlimited, no sk_ prefix)
   if (config && config.apiKey && apiKey === config.apiKey) {
-    return { valid: true };
+    return true;
   }
   
-  return { valid: false, error: "Invalid API key" };
+  return false;
 };
 
 module.exports = {

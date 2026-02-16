@@ -7,6 +7,9 @@ const base64Input = document.getElementById("base64");
 const detectBtn = document.getElementById("detect-btn");
 const loading = document.getElementById("loading");
 const loadingText = document.getElementById("loading-text");
+const uploadProgress = document.getElementById("upload-progress");
+const uploadProgressBar = document.getElementById("upload-progress-bar");
+const uploadProgressText = document.getElementById("upload-progress-text");
 const errorEl = document.getElementById("error");
 const languageWarningEl = document.getElementById("language-warning");
 const classificationEl = document.getElementById("classification");
@@ -68,6 +71,35 @@ const setLoading = (isLoading) => {
     startLoadingCycle();
   } else {
     stopLoadingCycle();
+    hideUploadProgress();
+  }
+};
+
+// Upload Progress Management
+const showUploadProgress = () => {
+  if (uploadProgress) {
+    uploadProgress.classList.add("is-active");
+  }
+};
+
+const hideUploadProgress = () => {
+  if (uploadProgress) {
+    uploadProgress.classList.remove("is-active");
+  }
+  if (uploadProgressBar) {
+    uploadProgressBar.style.width = "0%";
+  }
+  if (uploadProgressText) {
+    uploadProgressText.textContent = "0%";
+  }
+};
+
+const updateUploadProgress = (percent) => {
+  if (uploadProgressBar) {
+    uploadProgressBar.style.width = `${percent}%`;
+  }
+  if (uploadProgressText) {
+    uploadProgressText.textContent = `${percent}%`;
   }
 };
 
@@ -186,6 +218,14 @@ const readFileAsBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     
+    // Track file reading progress
+    reader.onprogress = (e) => {
+      if (e.lengthComputable) {
+        const percent = Math.round((e.loaded / e.total) * 50); // 0-50% for reading
+        updateUploadProgress(percent);
+      }
+    };
+    
     reader.onload = () => {
       const result = reader.result;
       if (typeof result !== "string") {
@@ -244,10 +284,18 @@ form.addEventListener("submit", async (event) => {
       }
     }
     
-    // Get base64
-    const audioBase64 = base64Input.value.trim()
-      ? base64Input.value.trim()
-      : await readFileAsBase64(file);
+    // Show progress bar
+    showUploadProgress();
+    updateUploadProgress(0);
+    
+    // Get base64 with progress tracking
+    let audioBase64;
+    if (base64Input.value.trim()) {
+      audioBase64 = base64Input.value.trim();
+      updateUploadProgress(50); // Skip to 50% if using direct base64
+    } else {
+      audioBase64 = await readFileAsBase64(file); // Shows 0-50% progress
+    }
     
     // Prepare request
     const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
@@ -262,21 +310,46 @@ form.addEventListener("submit", async (event) => {
       throw new Error("API key contains invalid characters. Please use only ASCII characters.");
     }
     
-    // Make API call
-    const response = await fetch(`${API_BASE_URL}/api/voice-detection`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": finalApiKey
-      },
-      body: JSON.stringify({
+    // Make API call with progress tracking
+    const xhr = new XMLHttpRequest();
+    
+    // Track upload progress (50-100%)
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        const uploadPercent = Math.round((e.loaded / e.total) * 50); // 0-50% of upload
+        const totalPercent = 50 + uploadPercent; // Add to file reading progress (50-100%)
+        updateUploadProgress(totalPercent);
+      }
+    });
+    
+    // Handle response
+    const apiResponse = await new Promise((resolve, reject) => {
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ ok: true, status: xhr.status, text: xhr.responseText });
+        } else {
+          resolve({ ok: false, status: xhr.status, text: xhr.responseText });
+        }
+      };
+      
+      xhr.onerror = () => reject(new Error("Network error"));
+      xhr.ontimeout = () => reject(new Error("Request timeout"));
+      
+      xhr.open("POST", `${API_BASE_URL}/api/voice-detection`);
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.setRequestHeader("x-api-key", finalApiKey);
+      xhr.timeout = 60000; // 60 second timeout
+      
+      xhr.send(JSON.stringify({
         language: languageSelect.value,
         audioFormat: "mp3",
         audioBase64
-      })
+      }));
     });
     
-    const text = await response.text();
+    hideUploadProgress();
+    
+    const text = apiResponse.text;
     let payload = null;
     
     if (text && text.trim()) {
@@ -287,7 +360,7 @@ form.addEventListener("submit", async (event) => {
       }
     }
     
-    if (!response.ok) {
+    if (!apiResponse.ok) {
       const serverMessage = payload && typeof payload.message === "string" 
         ? payload.message 
         : STRICT_ERROR_MESSAGE;

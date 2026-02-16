@@ -6,7 +6,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 // Paths
-const DATA_DIR = path.join(__dirname, "..", "..", "data");
+const DATA_DIR = path.join(__dirname, "..", "data");
 const ADMIN_FILE = path.join(DATA_DIR, "admin.json");
 const API_KEYS_FILE = path.join(DATA_DIR, "api_keys.json");
 const USAGE_FILE = path.join(DATA_DIR, "usage.json");

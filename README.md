@@ -58,86 +58,75 @@ Frontend runtime config:
 - Set `apiBaseUrl` if backend is on another origin.
 - API key is NOT stored or prefilled in the UI.
 
-## Docker Deployment (Recommended)
+## Production Deployment
 
-### GPU-Enabled (Faster)
+This project uses **systemd** for process management, which provides:
+- Automatic restart on crash
+- Start on system boot
+- Integrated logging
+- Resource limits
+- Security hardening
+
+### 1) Environment Configuration
+Create `.env` file in project root or set environment variables:
 ```bash
-# Install NVIDIA Container Toolkit (if you have GPU)
-sudo apt-get install -y nvidia-container-toolkit
-sudo systemctl restart docker
-
-# Build and run
-cd /var/www/voice-ai-detection
-cp .env.docker .env
-nano .env  # Set your API key!
-docker-compose up -d
-
-# Verify
-docker-compose logs -f
-docker exec voice-ai-detection python3 /app/backend/deep/detect_device.py
-```
-
-### CPU-Only (Budget VPS)
-```bash
-cd /var/www/voice-ai-detection
-cp .env.docker .env
-nano .env  # Set your API key!
-docker-compose -f docker-compose.cpu.yml up -d
-
-# Verify
-docker-compose logs -f
-```
-
-See [DOCKER_GUIDE.md](DOCKER_GUIDE.md) and [DOCKER_SETTINGS_REFERENCE.txt](DOCKER_SETTINGS_REFERENCE.txt) for detailed instructions.
-
-## Production Deploy (Nginx + systemd)
-
-### 1) Backend environment
-Create `/etc/voice-ai-detection.env`:
-```
 VOICE_DETECT_API_KEY=your-secret-key
 HOST=127.0.0.1
-CORS_ORIGINS=https://voiceai.parikshit.dev
-DEEP_MODEL_DEVICE=cpu
-DEEP_MODEL_PATH_ENGLISH=/var/www/voice-ai-detection/backend/deep/multitask_English.pt
-DEEP_MODEL_PATH_HINDI=/var/www/voice-ai-detection/backend/deep/multitask_Hindi.pt
-DEEP_MODEL_PATH_TAMIL=/var/www/voice-ai-detection/backend/deep/multitask_Tamil.pt
-DEEP_MODEL_PATH_MALAYALAM=/var/www/voice-ai-detection/backend/deep/multitask_Malayalam.pt
-DEEP_MODEL_PATH_TELUGU=/var/www/voice-ai-detection/backend/deep/multitask_Telugu.pt
-QUEUE_MAX_CONCURRENT=3
-QUEUE_MAX_LENGTH=10
+CORS_ORIGINS=https://yourdomain.com
+DEEP_MODEL_DEVICE=auto
+DEEP_MODEL_PATH_ENGLISH=/path/to/backend/deep/multitask_English.pt
+DEEP_MODEL_PATH_HINDI=/path/to/backend/deep/multitask_Hindi.pt
+DEEP_MODEL_PATH_TAMIL=/path/to/backend/deep/multitask_Tamil.pt
+DEEP_MODEL_PATH_MALAYALAM=/path/to/backend/deep/multitask_Malayalam.pt
+DEEP_MODEL_PATH_TELUGU=/path/to/backend/deep/multitask_Telugu.pt
+QUEUE_MAX_CONCURRENT=8
+QUEUE_MAX_LENGTH=20
 ```
 
-### 2) Systemd service
-Example `/etc/systemd/system/voice-ai-detection.service`:
-```
-[Unit]
-Description=Voice AI Detection API
-After=network.target
+### 2) Systemd Service (Auto-restart on Crash)
 
-[Service]
-Type=simple
-WorkingDirectory=/var/www/voice-ai-detection/backend
-EnvironmentFile=/etc/voice-ai-detection.env
-ExecStart=/usr/bin/node server.js
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable and start:
+Copy the service file to systemd:
 ```bash
+sudo cp voice-ai-detection.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now voice-ai-detection.service
 ```
 
-### 3) Nginx (SSL + API proxy)
+Enable and start the service:
+```bash
+sudo systemctl enable voice-ai-detection
+sudo systemctl start voice-ai-detection
+sudo systemctl status voice-ai-detection
+```
+
+The service will:
+- ✓ Start automatically on system boot
+- ✓ Restart automatically if it crashes (within 5 seconds)
+- ✓ Log to system journal
+- ✓ Run with proper security restrictions
+
+Manage the service:
+```bash
+# Check status
+sudo systemctl status voice-ai-detection
+
+# View logs
+sudo journalctl -u voice-ai-detection -f
+
+# Restart
+sudo systemctl restart voice-ai-detection
+
+# Stop
+sudo systemctl stop voice-ai-detection
+
+# Disable auto-start
+sudo systemctl disable voice-ai-detection
+```
+
+### 3) Nginx Configuration (SSL + API Proxy)
 Example server block:
 ```nginx
 server {
-    server_name voiceai.parikshit.dev;
+    server_name yourdomain.com;
 
     root /var/www/voice-ai-detection/frontend;
     index index.html;
@@ -155,21 +144,25 @@ server {
         try_files $uri /index.html;
     }
 
-    # Optional: disable caching
-    add_header Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0" always;
-    add_header Pragma "no-cache" always;
-    add_header Expires "0" always;
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+}
 
-    listen 443 ssl; # managed by Certbot
-    ssl_certificate /etc/letsencrypt/live/voiceai.parikshit.dev/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/voiceai.parikshit.dev/privkey.pem;
-    include /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+server {
+    listen 80;
+    server_name yourdomain.com;
+    return 301 https://$server_name$request_uri;
 }
 ```
 
-### 4) Health
+### 4) Health Check
 `GET /health` returns `{ "status": "ok" }`.
+
+Test your deployment:
+```bash
+curl http://localhost:3000/health
+```
 
 ## API
 

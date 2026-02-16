@@ -115,7 +115,7 @@ unset DEEP_MODEL_DEVICE
    # Auto-detects GPU, installs CUDA version
    
    # Restart server
-   pm2 restart voice-ai-detection
+   sudo systemctl restart voice-ai-detection
    # Now uses GPU!
    ```
 
@@ -134,7 +134,7 @@ unset DEEP_MODEL_DEVICE
    
    # Or explicitly force CPU:
    export DEEP_MODEL_DEVICE=cpu
-   pm2 restart voice-ai-detection
+   sudo systemctl restart voice-ai-detection
    ```
 
 ## Production Deployment
@@ -156,8 +156,6 @@ DEEP_MODEL_DEVICE=auto
 
 ```bash
 sudo systemctl restart voice-ai-detection
-# OR
-pm2 restart voice-ai-detection
 ```
 
 ## Verifying GPU Usage
@@ -165,7 +163,7 @@ pm2 restart voice-ai-detection
 ### Method 1: Check Logs
 ```bash
 # System logs show detected device at startup
-pm2 logs voice-ai-detection | grep -i device
+sudo journalctl -u voice-ai-detection -f | grep -i device
 ```
 
 ### Method 2: Monitor GPU
@@ -214,7 +212,7 @@ cd /var/www/voice-ai-detection
 ```bash
 # Force CPU mode temporarily
 export DEEP_MODEL_DEVICE=cpu
-pm2 restart voice-ai-detection
+sudo systemctl restart voice-ai-detection
 ```
 
 ### GPU too slow / not working

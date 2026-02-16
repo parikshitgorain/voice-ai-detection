@@ -43,8 +43,8 @@ const config = {
     refillPerSecond: 0.2,
   },
   queue: {
-    maxConcurrent: Number.parseInt(process.env.QUEUE_MAX_CONCURRENT, 10) || 3,
-    maxQueue: Number.parseInt(process.env.QUEUE_MAX_LENGTH, 10) || 10,
+    maxConcurrent: Number.parseInt(process.env.QUEUE_MAX_CONCURRENT, 10) || 8,
+    maxQueue: Number.parseInt(process.env.QUEUE_MAX_LENGTH, 10) || 20,
   },
   replayCache: {
     ttlMs: 5 * 60 * 1000,
@@ -104,7 +104,7 @@ const config = {
     scriptPath: process.env.DEEP_MODEL_SCRIPT || null,
     modelPath: process.env.DEEP_MODEL_PATH || null,
     device: process.env.DEEP_MODEL_DEVICE || defaultDevice,
-    timeoutMs: 30000,
+    timeoutMs: 15000, // Reduced from 30s to 15s for faster responses
     classifyThreshold: 0.5,
     fusionWeight: 0.45,
     evidenceThreshold: 0.65,

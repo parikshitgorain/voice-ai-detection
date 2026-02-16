@@ -1,0 +1,32 @@
+[Unit]
+Description=Voice AI Detection API Server
+Documentation=https://github.com/yourusername/voice-ai-detection
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/voice-ai-detection/backend
+EnvironmentFile=/var/www/voice-ai-detection/.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=voice-ai-detection
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/www/voice-ai-detection/backend/logs
+ReadWritePaths=/var/www/voice-ai-detection/backend/data
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

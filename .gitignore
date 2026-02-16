@@ -25,14 +25,12 @@ data/
 # Training artifacts / venv
 backend/deep/.venv/
 backend/deep/train.log
-scripts/data_prep/.venv/
-scripts/data_prep/config.yaml
 
-# Nginx deploy output (production runtime only)
-/var/www/voice-ai-detection/
-
-# Frontend runtime config (avoid committing secrets)
+# Environment files (keep secrets out of repo)
 *.env
+.env
+.env.local
+.env.production
 
 # Keep trained models tracked
 backend/deep/*.pt

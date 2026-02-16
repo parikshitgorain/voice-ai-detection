@@ -53,7 +53,10 @@ const handleVoiceDetection = async (req, res, payload, config) => {
   const logBase = buildLogBase(req, payload);
 
   const authResult = isValidApiKey(req.headers, config);
-  if (!authResult || !authResult.valid) {
+  // Handle both boolean and object return types
+  const isValid = typeof authResult === 'boolean' ? authResult : (authResult && authResult.valid);
+  
+  if (!isValid) {
     sendError(res, 401, "Invalid API key.");
     logDetection({
       ...logBase,

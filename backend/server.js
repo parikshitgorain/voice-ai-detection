@@ -1,5 +1,7 @@
 const http = require("http");
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const config = require("./config");
 const { handleVoiceDetection } = require("./api/voice_detection");
 const { QueueFullError, createRequestQueue } = require("./utils/request_queue");
@@ -54,6 +56,49 @@ const sendNotFound = (res) => {
   sendJson(res, 404, { status: "error", message: "Not Found" });
 };
 
+// Serve static frontend files
+const serveFrontend = (req, res) => {
+  const frontendDir = path.join(__dirname, "..", "frontend");
+  let filePath = path.join(frontendDir, req.url === "/" ? "index.html" : req.url);
+  
+  // Security: prevent directory traversal
+  if (!filePath.startsWith(frontendDir)) {
+    sendNotFound(res);
+    return false;
+  }
+  
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    return false;
+  }
+  
+  // Determine content type
+  const ext = path.extname(filePath);
+  const contentTypes = {
+    ".html": "text/html",
+    ".js": "application/javascript",
+    ".css": "text/css",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml"
+  };
+  
+  const contentType = contentTypes[ext] || "text/plain";
+  
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
+      sendNotFound(res);
+      return;
+    }
+    res.writeHead(200, { "Content-Type": contentType });
+    res.end(data);
+  });
+  
+  return true;
+};
+
 const server = http.createServer((req, res) => {
   if (adminRouter(req, res)) { return; }
   applyCors(req, res);
@@ -66,6 +111,13 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/health") {
     sendJson(res, 200, { status: "ok" });
     return;
+  }
+  
+  // Serve frontend files for GET requests
+  if (req.method === "GET" && !req.url.startsWith("/api/")) {
+    if (serveFrontend(req, res)) {
+      return;
+    }
   }
 
   if (req.method === "GET" && req.url === "/api/queue") {
